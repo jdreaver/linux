@@ -49,11 +49,8 @@ static int sample_kernfs_add_counter_file(struct kernfs_node *dir_kn)
 
 static int sample_kernfs_populate_dir(struct kernfs_node *dir_kn)
 {
-	// We allocate a struct to hold the counter, which gets stuffed into the
-	// private data of the kernfs_node for this directory.
-	//
-	// TODO: When we implement creating/removing directories, ensure we free
-	// this.
+	// We allocate a struct to hold directory information, which gets
+	// stuffed into the private data of the kernfs_node for this directory.
 	struct sample_kernfs_directory *dir;
 	dir = kzalloc(sizeof(struct sample_kernfs_directory), GFP_KERNEL);
 	if (!dir)
@@ -66,6 +63,24 @@ static int sample_kernfs_populate_dir(struct kernfs_node *dir_kn)
 
 	return 0;
 }
+
+static int sample_kernfs_mkdir(struct kernfs_node *parent_kn, const char *name, umode_t mode)
+{
+	// N.B. Pass NULL for as the priv argument. It is allocated and assigned
+	// in sample_kernfs_populate_dir so the root directory gets it too.
+	struct kernfs_node *dir_kn;
+	dir_kn = kernfs_create_dir_ns(parent_kn, name, mode, current_fsuid(),
+				      current_fsgid(), NULL, NULL);
+
+	if (IS_ERR(dir_kn))
+		return PTR_ERR(dir_kn);
+
+	return sample_kernfs_populate_dir(dir_kn);
+}
+
+static struct kernfs_syscall_ops sample_kernfs_kf_syscall_ops = {
+	.mkdir		= sample_kernfs_mkdir,
+};
 
 static int sample_kernfs_get_tree(struct fs_context *fc)
 {
@@ -84,7 +99,7 @@ static int sample_kernfs_init_fs_context(struct fs_context *fc)
 		return -ENOMEM;
 
 	struct kernfs_root *root;
-	root = kernfs_create_root(NULL, 0, NULL);
+	root = kernfs_create_root(&sample_kernfs_kf_syscall_ops, 0, NULL);
 	if (IS_ERR(root))
 		return PTR_ERR(root);
 
