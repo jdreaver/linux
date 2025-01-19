@@ -14,6 +14,59 @@
 
 #define SAMPLE_KERNFS_MAGIC 0x8d000ff0
 
+struct sample_kernfs_directory {
+	atomic64_t count;
+};
+
+static int sample_kernfs_counter_seq_show(struct seq_file *sf, void *v)
+{
+	struct kernfs_open_file *of = sf->private;
+	struct kernfs_node *dir_kn = kernfs_get_parent(of->kn);
+	struct sample_kernfs_directory *counter_dir = dir_kn->priv;
+
+	u64 count = atomic64_inc_return(&counter_dir->count);
+	seq_printf(sf, "%llu\n", count);
+	return 0;
+}
+
+static struct kernfs_ops sample_kernfs_counter_kf_ops = {
+	.seq_show	= sample_kernfs_counter_seq_show,
+};
+
+static int sample_kernfs_add_counter_file(struct kernfs_node *dir_kn)
+{
+	struct kernfs_node *kn;
+	kn = __kernfs_create_file(dir_kn, "counter", 0666, current_fsuid(),
+				  current_fsgid(), 0,
+				  &sample_kernfs_counter_kf_ops, NULL,
+				  NULL, NULL);
+
+	if (IS_ERR(kn))
+		return PTR_ERR(kn);
+
+	return 0;
+}
+
+static int sample_kernfs_populate_dir(struct kernfs_node *dir_kn)
+{
+	// We allocate a struct to hold the counter, which gets stuffed into the
+	// private data of the kernfs_node for this directory.
+	//
+	// TODO: When we implement creating/removing directories, ensure we free
+	// this.
+	struct sample_kernfs_directory *dir;
+	dir = kzalloc(sizeof(struct sample_kernfs_directory), GFP_KERNEL);
+	if (!dir)
+		return -ENOMEM;
+	dir_kn->priv = dir;
+
+	int err = sample_kernfs_add_counter_file(dir_kn);
+	if (err)
+		return err;
+
+	return 0;
+}
+
 static int sample_kernfs_get_tree(struct fs_context *fc)
 {
 	return kernfs_get_tree(fc);
@@ -40,6 +93,12 @@ static int sample_kernfs_init_fs_context(struct fs_context *fc)
 	fc->fs_private = kfc;
 	fc->ops = &sample_kernfs_fs_context_ops;
 	fc->global = true;
+
+	int err = sample_kernfs_populate_dir(kernfs_root_to_node(root));
+	if (err) {
+		kernfs_destroy_root(root);
+		return err;
+	}
 
 	return 0;
 }
