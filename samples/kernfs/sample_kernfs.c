@@ -78,8 +78,24 @@ static int sample_kernfs_mkdir(struct kernfs_node *parent_kn, const char *name, 
 	return sample_kernfs_populate_dir(dir_kn);
 }
 
+static int sample_kernfs_rmdir(struct kernfs_node *kn)
+{
+	// Free our sample_kernfs_directory struct, stored in the node's private
+	// data.
+	kfree(kn->priv);
+
+	// kernfs_remove_self safely removes the node while also breaking out of
+	// kernfs active protection (see kernfs_break_active_protection). This
+	// is necessary to avoid a deadlock because the kernfs function that
+	// called rmdir is holding the lock.
+	kernfs_remove_self(kn);
+
+	return 0;
+}
+
 static struct kernfs_syscall_ops sample_kernfs_kf_syscall_ops = {
 	.mkdir		= sample_kernfs_mkdir,
+	.rmdir		= sample_kernfs_rmdir,
 };
 
 static int sample_kernfs_get_tree(struct fs_context *fc)
