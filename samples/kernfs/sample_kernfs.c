@@ -29,8 +29,26 @@ static int sample_kernfs_counter_seq_show(struct seq_file *sf, void *v)
 	return 0;
 }
 
+static ssize_t sample_kernfs_counter_write(struct kernfs_open_file *of, char *buf,
+					   size_t nbytes, loff_t off)
+{
+	struct kernfs_node *dir_kn = kernfs_get_parent(of->kn);
+	struct sample_kernfs_directory *counter_dir = dir_kn->priv;
+
+	// N.B. kernfs handles ensuring the given buffer is nul-terminated.
+	u64 new_value;
+	int ret = kstrtou64(strstrip(buf), 10, &new_value);
+	if (ret)
+		return ret;
+
+	atomic64_set(&counter_dir->count, new_value);
+
+	return nbytes;
+}
+
 static struct kernfs_ops sample_kernfs_counter_kf_ops = {
 	.seq_show	= sample_kernfs_counter_seq_show,
+	.write		= sample_kernfs_counter_write,
 };
 
 static int sample_kernfs_add_counter_file(struct kernfs_node *dir_kn)
