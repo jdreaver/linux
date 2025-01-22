@@ -196,6 +196,16 @@ int kernfs_iop_getattr(struct mnt_idmap *idmap,
 	return 0;
 }
 
+kuid_t kernfs_node_owner(struct kernfs_node *kn)
+{
+	return kernfs_iattrs(kn)->ia_uid;
+}
+
+kgid_t kernfs_node_group(struct kernfs_node *kn)
+{
+	return kernfs_iattrs(kn)->ia_gid;
+}
+
 static void kernfs_init_inode(struct kernfs_node *kn, struct inode *inode)
 {
 	kernfs_get(kn);

@@ -1826,69 +1826,16 @@ static ssize_t trace_seq_to_buffer(struct trace_seq *s, void *buf, size_t cnt)
 unsigned long __read_mostly	tracing_thresh;
 
 #ifdef CONFIG_TRACER_MAX_TRACE
-static const struct file_operations tracing_max_lat_fops;
+static const struct kernfs_ops tracing_max_lat_fops;
 
 #ifdef LATENCY_FS_NOTIFY
 
-static struct workqueue_struct *fsnotify_wq;
-
-static void latency_fsnotify_workfn(struct work_struct *work)
-{
-	struct trace_array *tr = container_of(work, struct trace_array,
-					      fsnotify_work);
-	fsnotify_inode(tr->d_max_latency->d_inode, FS_MODIFY);
-}
-
-static void latency_fsnotify_workfn_irq(struct irq_work *iwork)
-{
-	struct trace_array *tr = container_of(iwork, struct trace_array,
-					      fsnotify_irqwork);
-	queue_work(fsnotify_wq, &tr->fsnotify_work);
-}
-
-static void trace_create_maxlat_file(struct trace_array *tr,
-				     struct dentry *d_tracer)
-{
-	INIT_WORK(&tr->fsnotify_work, latency_fsnotify_workfn);
-	init_irq_work(&tr->fsnotify_irqwork, latency_fsnotify_workfn_irq);
-	tr->d_max_latency = trace_create_file("tracing_max_latency",
-					      TRACE_MODE_WRITE,
-					      d_tracer, tr,
-					      &tracing_max_lat_fops);
-}
-
-__init static int latency_fsnotify_init(void)
-{
-	fsnotify_wq = alloc_workqueue("tr_max_lat_wq",
-				      WQ_UNBOUND | WQ_HIGHPRI, 0);
-	if (!fsnotify_wq) {
-		pr_err("Unable to allocate tr_max_lat_wq\n");
-		return -ENOMEM;
-	}
-	return 0;
-}
-
-late_initcall_sync(latency_fsnotify_init);
-
 void latency_fsnotify(struct trace_array *tr)
 {
-	if (!fsnotify_wq)
-		return;
-	/*
-	 * We cannot call queue_work(&tr->fsnotify_work) from here because it's
-	 * possible that we are called from __schedule() or do_idle(), which
-	 * could cause a deadlock.
-	 */
-	irq_work_queue(&tr->fsnotify_irqwork);
+	kernfs_notify(tr->d_max_latency);
 }
 
-#else /* !LATENCY_FS_NOTIFY */
-
-#define trace_create_maxlat_file(tr, d_tracer)				\
-	trace_create_file("tracing_max_latency", TRACE_MODE_WRITE,	\
-			  d_tracer, tr, &tracing_max_lat_fops)
-
-#endif
+#endif /* !LATENCY_FS_NOTIFY */
 
 /*
  * Copy the new maximum trace into the separate maximum-trace
@@ -4512,12 +4459,12 @@ static int s_show(struct seq_file *m, void *v)
 
 /*
  * Should be used after trace_array_get(), trace_types_lock
- * ensures that i_cdev was already initialized.
+ * ensures that kernfs_node->priv was already initialized.
  */
-static inline int tracing_get_cpu(struct inode *inode)
+static inline int tracing_get_cpu(struct kernfs_node *kfn)
 {
-	if (inode->i_cdev) /* See trace_create_cpu_file() */
-		return (long)inode->i_cdev - 1;
+	if (kfn->priv) /* See trace_create_cpu_file() */
+		return (long)kfn->priv - 1;
 	return RING_BUFFER_ALL_CPUS;
 }
 
@@ -4548,16 +4495,16 @@ static void free_trace_iter_content(struct trace_iterator *iter)
 }
 
 static struct trace_iterator *
-__tracing_open(struct inode *inode, struct file *file, bool snapshot)
+__tracing_open(struct kernfs_open_file *of, bool snapshot)
 {
-	struct trace_array *tr = inode->i_private;
+	struct trace_array *tr = of->priv;
 	struct trace_iterator *iter;
 	int cpu;
 
 	if (tracing_disabled)
 		return ERR_PTR(-ENODEV);
 
-	iter = __seq_open_private(file, &tracer_seq_ops, sizeof(*iter));
+	iter = __seq_open_private(of->file, &tracer_seq_ops, sizeof(*iter));
 	if (!iter)
 		return ERR_PTR(-ENOMEM);
 
@@ -4605,7 +4552,7 @@ __tracing_open(struct inode *inode, struct file *file, bool snapshot)
 		iter->array_buffer = &tr->array_buffer;
 	iter->snapshot = snapshot;
 	iter->pos = -1;
-	iter->cpu_file = tracing_get_cpu(inode);
+	iter->cpu_file = tracing_get_cpu(of->kn);
 	mutex_init(&iter->mutex);
 
 	/* Notify the tracer early; before we stop tracing. */
@@ -4660,7 +4607,7 @@ release:
 	return ERR_PTR(-ENOMEM);
 }
 
-int tracing_open_generic(struct inode *inode, struct file *filp)
+int tracing_open_generic(struct kernfs_open_file *of)
 {
 	int ret;
 
@@ -4668,7 +4615,8 @@ int tracing_open_generic(struct inode *inode, struct file *filp)
 	if (ret)
 		return ret;
 
-	filp->private_data = inode->i_private;
+	of->priv = of->kn->priv;
+
 	return 0;
 }
 
@@ -4681,16 +4629,16 @@ bool tracing_is_disabled(void)
  * Open and update trace_array ref count.
  * Must have the current trace_array passed to it.
  */
-int tracing_open_generic_tr(struct inode *inode, struct file *filp)
+int tracing_open_generic_tr(struct kernfs_open_file *of)
 {
-	struct trace_array *tr = inode->i_private;
+	struct trace_array *tr = of->kn->priv;
 	int ret;
 
 	ret = tracing_check_open_get_tr(tr);
 	if (ret)
 		return ret;
 
-	filp->private_data = inode->i_private;
+	of->priv = of->kn->priv;
 
 	return 0;
 }
@@ -4699,9 +4647,9 @@ int tracing_open_generic_tr(struct inode *inode, struct file *filp)
  * The private pointer of the inode is the trace_event_file.
  * Update the tr ref count associated to it.
  */
-int tracing_open_file_tr(struct inode *inode, struct file *filp)
+int tracing_open_file_tr(struct kernfs_open_file *of)
 {
-	struct trace_event_file *file = inode->i_private;
+	struct trace_event_file *file = of->priv;
 	int ret;
 
 	ret = tracing_check_open_get_tr(file->tr);
@@ -4722,31 +4670,22 @@ int tracing_open_file_tr(struct inode *inode, struct file *filp)
 	if (ret)
 		return ret;
 
-	filp->private_data = inode->i_private;
-
 	return 0;
 }
 
-int tracing_release_file_tr(struct inode *inode, struct file *filp)
+void tracing_release_file_tr(struct kernfs_open_file *of)
 {
-	struct trace_event_file *file = inode->i_private;
+	struct trace_event_file *file = of->priv;
 
 	trace_array_put(file->tr);
 	event_file_put(file);
-
-	return 0;
 }
 
-int tracing_single_release_file_tr(struct inode *inode, struct file *filp)
+static int tracing_mark_open(struct kernfs_open_file *of)
 {
-	tracing_release_file_tr(inode, filp);
-	return single_release(inode, filp);
-}
-
-static int tracing_mark_open(struct inode *inode, struct file *filp)
-{
-	stream_open(inode, filp);
-	return tracing_open_generic_tr(inode, filp);
+	/* TODO What does stream_open do? */
+	/* stream_open(inode, filp); */
+	return tracing_open_generic_tr(of);
 }
 
 static int tracing_release(struct inode *inode, struct file *file)
@@ -4787,26 +4726,16 @@ static int tracing_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-int tracing_release_generic_tr(struct inode *inode, struct file *file)
+void tracing_release_generic_tr(struct kernfs_open_file *of)
 {
-	struct trace_array *tr = inode->i_private;
+	struct trace_array *tr = of->priv;
 
 	trace_array_put(tr);
-	return 0;
 }
 
-static int tracing_single_release_tr(struct inode *inode, struct file *file)
+static int tracing_open(struct kernfs_open_file *of)
 {
-	struct trace_array *tr = inode->i_private;
-
-	trace_array_put(tr);
-
-	return single_release(inode, file);
-}
-
-static int tracing_open(struct inode *inode, struct file *file)
-{
-	struct trace_array *tr = inode->i_private;
+	struct trace_array *tr = of->priv;
 	struct trace_iterator *iter;
 	int ret;
 
@@ -4815,8 +4744,8 @@ static int tracing_open(struct inode *inode, struct file *file)
 		return ret;
 
 	/* If this file was open for write, then erase contents */
-	if ((file->f_mode & FMODE_WRITE) && (file->f_flags & O_TRUNC)) {
-		int cpu = tracing_get_cpu(inode);
+	if ((of->file->f_mode & FMODE_WRITE) && (of->file->f_flags & O_TRUNC)) {
+		int cpu = tracing_get_cpu(of->kn);
 		struct array_buffer *trace_buf = &tr->array_buffer;
 
 #ifdef CONFIG_TRACER_MAX_TRACE
@@ -4830,8 +4759,8 @@ static int tracing_open(struct inode *inode, struct file *file)
 			tracing_reset_cpu(trace_buf, cpu);
 	}
 
-	if (file->f_mode & FMODE_READ) {
-		iter = __tracing_open(inode, file, false);
+	if (of->file->f_mode & FMODE_READ) {
+		iter = __tracing_open(of, false);
 		if (IS_ERR(iter))
 			ret = PTR_ERR(iter);
 		else if (tr->trace_flags & TRACE_ITER_LATENCY_FMT)
@@ -4920,35 +4849,6 @@ static int t_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-static const struct seq_operations show_traces_seq_ops = {
-	.start		= t_start,
-	.next		= t_next,
-	.stop		= t_stop,
-	.show		= t_show,
-};
-
-static int show_traces_open(struct inode *inode, struct file *file)
-{
-	struct trace_array *tr = inode->i_private;
-	struct seq_file *m;
-	int ret;
-
-	ret = tracing_check_open_get_tr(tr);
-	if (ret)
-		return ret;
-
-	ret = seq_open(file, &show_traces_seq_ops);
-	if (ret) {
-		trace_array_put(tr);
-		return ret;
-	}
-
-	m = file->private_data;
-	m->private = tr;
-
-	return 0;
-}
-
 static int tracing_seq_release(struct inode *inode, struct file *file)
 {
 	struct trace_array *tr = inode->i_private;
@@ -4976,7 +4876,8 @@ loff_t tracing_lseek(struct file *file, loff_t offset, int whence)
 	return ret;
 }
 
-static const struct file_operations tracing_fops = {
+static const struct kernfs_ops tracing_fops = {
+	/* TODO This uses tracer_seq_ops under the hood, nested in __tracing_open */
 	.open		= tracing_open,
 	.read		= seq_read,
 	.read_iter	= seq_read_iter,
@@ -4986,39 +4887,28 @@ static const struct file_operations tracing_fops = {
 	.release	= tracing_release,
 };
 
-static const struct file_operations show_traces_fops = {
-	.open		= show_traces_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= tracing_seq_release,
+static const struct kernfs_ops show_traces_fops = {
+	.open		= tracing_open_generic_tr,
+	.seq_start	= t_start,
+	.seq_next	= t_next,
+	.seq_stop	= t_stop,
+	.seq_show	= t_show,
 };
 
 static ssize_t
-tracing_cpumask_read(struct file *filp, char __user *ubuf,
-		     size_t count, loff_t *ppos)
+tracing_cpumask_read(struct kernfs_open_file *of, char *buf,
+		     size_t count, loff_t ppos)
 {
-	struct trace_array *tr = file_inode(filp)->i_private;
-	char *mask_str;
+	struct trace_array *tr = of->priv;
 	int len;
 
-	len = snprintf(NULL, 0, "%*pb\n",
-		       cpumask_pr_args(tr->tracing_cpumask)) + 1;
-	mask_str = kmalloc(len, GFP_KERNEL);
-	if (!mask_str)
-		return -ENOMEM;
-
-	len = snprintf(mask_str, len, "%*pb\n",
+	len = snprintf(buf, len, "%*pb\n",
 		       cpumask_pr_args(tr->tracing_cpumask));
 	if (len >= count) {
 		count = -EINVAL;
-		goto out_err;
 	}
-	count = simple_read_from_buffer(ubuf, count, ppos, mask_str, len);
 
-out_err:
-	kfree(mask_str);
-
-	return count;
+	return len;
 }
 
 int tracing_set_cpumask(struct trace_array *tr,
@@ -5062,10 +4952,10 @@ int tracing_set_cpumask(struct trace_array *tr,
 }
 
 static ssize_t
-tracing_cpumask_write(struct file *filp, const char __user *ubuf,
-		      size_t count, loff_t *ppos)
+tracing_cpumask_write(struct kernfs_open_file *of, char *buf,
+		      size_t count, loff_t ppos)
 {
-	struct trace_array *tr = file_inode(filp)->i_private;
+	struct trace_array *tr = of->priv;
 	cpumask_var_t tracing_cpumask_new;
 	int err;
 
@@ -5075,7 +4965,7 @@ tracing_cpumask_write(struct file *filp, const char __user *ubuf,
 	if (!zalloc_cpumask_var(&tracing_cpumask_new, GFP_KERNEL))
 		return -ENOMEM;
 
-	err = cpumask_parse_user(ubuf, count, tracing_cpumask_new);
+	err = cpumask_parse_user(buf, count, tracing_cpumask_new);
 	if (err)
 		goto err_free;
 
@@ -5093,12 +4983,11 @@ err_free:
 	return err;
 }
 
-static const struct file_operations tracing_cpumask_fops = {
+static const struct kernfs_ops tracing_cpumask_fops = {
 	.open		= tracing_open_generic_tr,
 	.read		= tracing_cpumask_read,
 	.write		= tracing_cpumask_write,
 	.release	= tracing_release_generic_tr,
-	.llseek		= generic_file_llseek,
 };
 
 static int tracing_trace_options_show(struct seq_file *m, void *v)
@@ -5309,52 +5198,26 @@ static void __init apply_trace_boot_options(void)
 }
 
 static ssize_t
-tracing_trace_options_write(struct file *filp, const char __user *ubuf,
-			size_t cnt, loff_t *ppos)
+tracing_trace_options_write(struct kernfs_open_file *of, char *buf,
+			    size_t cnt, loff_t ppos)
 {
-	struct seq_file *m = filp->private_data;
+	struct seq_file *m = of->priv;
 	struct trace_array *tr = m->private;
-	char buf[64];
 	int ret;
 
 	if (cnt >= sizeof(buf))
 		return -EINVAL;
 
-	if (copy_from_user(buf, ubuf, cnt))
-		return -EFAULT;
-
-	buf[cnt] = 0;
-
 	ret = trace_set_options(tr, buf);
 	if (ret < 0)
 		return ret;
 
-	*ppos += cnt;
-
 	return cnt;
 }
 
-static int tracing_trace_options_open(struct inode *inode, struct file *file)
-{
-	struct trace_array *tr = inode->i_private;
-	int ret;
-
-	ret = tracing_check_open_get_tr(tr);
-	if (ret)
-		return ret;
-
-	ret = single_open(file, tracing_trace_options_show, inode->i_private);
-	if (ret < 0)
-		trace_array_put(tr);
-
-	return ret;
-}
-
-static const struct file_operations tracing_iter_fops = {
-	.open		= tracing_trace_options_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= tracing_single_release_tr,
+static const struct kernfs_ops tracing_iter_fops = {
+	.seq_show	= tracing_trace_options_show,
+	.release	= tracing_release_generic_tr,
 	.write		= tracing_trace_options_write,
 };
 
@@ -5657,17 +5520,31 @@ static const char readme_msg[] =
 ;
 
 static ssize_t
-tracing_readme_read(struct file *filp, char __user *ubuf,
-		       size_t cnt, loff_t *ppos)
+tracing_readme_read(struct kernfs_open_file *of, char *buf,
+		    size_t count, loff_t ppos)
 {
-	return simple_read_from_buffer(ubuf, cnt, ppos,
-					readme_msg, strlen(readme_msg));
+	/*
+	 * TODO Is there a generic kernel function like simple_write_to_buffer
+	 * for non-user buffers? This is all boilerplate. Maybe write one in
+	 * kernfs?
+	 */
+	size_t available = strlen(readme_msg);
+	size_t remaining = available - ppos;
+
+	if (ppos >= available || !count)
+		return 0;
+
+	if (count > remaining)
+		count = remaining;
+
+	memcpy(buf, readme_msg + ppos, count);
+
+	return count;
 }
 
-static const struct file_operations tracing_readme_fops = {
+static const struct kernfs_ops tracing_readme_fops = {
 	.open		= tracing_open_generic,
 	.read		= tracing_readme_read,
-	.llseek		= generic_file_llseek,
 };
 
 #ifdef CONFIG_TRACE_EVAL_MAP_FILE
@@ -5738,29 +5615,12 @@ static int eval_map_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-static const struct seq_operations tracing_eval_map_seq_ops = {
-	.start		= eval_map_start,
-	.next		= eval_map_next,
-	.stop		= eval_map_stop,
-	.show		= eval_map_show,
-};
-
-static int tracing_eval_map_open(struct inode *inode, struct file *filp)
-{
-	int ret;
-
-	ret = tracing_check_open_get_tr(NULL);
-	if (ret)
-		return ret;
-
-	return seq_open(filp, &tracing_eval_map_seq_ops);
-}
-
-static const struct file_operations tracing_eval_map_fops = {
-	.open		= tracing_eval_map_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release,
+static const struct kernfs_ops tracing_eval_map_fops = {
+	.open		= tracing_open_generic,
+	.seq_start	= eval_map_start,
+	.seq_next	= eval_map_next,
+	.seq_stop	= eval_map_stop,
+	.seq_show	= eval_map_show,
 };
 
 static inline union trace_eval_map_item *
@@ -5818,14 +5678,14 @@ trace_insert_eval_map_file(struct module *mod, struct trace_eval_map **start,
 	memset(map_array, 0, sizeof(*map_array));
 }
 
-static void trace_create_eval_file(struct dentry *d_tracer)
+static void trace_create_eval_file(struct kernfs_node *d_tracer)
 {
 	trace_create_file("eval_map", TRACE_MODE_READ, d_tracer,
 			  NULL, &tracing_eval_map_fops);
 }
 
 #else /* CONFIG_TRACE_EVAL_MAP_FILE */
-static inline void trace_create_eval_file(struct dentry *d_tracer) { }
+static inline void trace_create_eval_file(struct kernfs_node *d_tracer) { }
 static inline void trace_insert_eval_map_file(struct module *mod,
 			      struct trace_eval_map **start, int len) { }
 #endif /* !CONFIG_TRACE_EVAL_MAP_FILE */
@@ -5845,19 +5705,16 @@ static void trace_insert_eval_map(struct module *mod,
 	trace_insert_eval_map_file(mod, start, len);
 }
 
-static ssize_t
-tracing_set_trace_read(struct file *filp, char __user *ubuf,
-		       size_t cnt, loff_t *ppos)
+static int tracing_set_trace_show(struct seq_file *seq, void *m)
 {
-	struct trace_array *tr = filp->private_data;
-	char buf[MAX_TRACER_SIZE+2];
-	int r;
+	struct kernfs_open_file *of = seq->private;
+	struct trace_array *tr = of->priv;
 
 	mutex_lock(&trace_types_lock);
-	r = sprintf(buf, "%s\n", tr->current_trace->name);
+	seq_printf(seq, "%s\n", tr->current_trace->name);
 	mutex_unlock(&trace_types_lock);
 
-	return simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+	return 0;
 }
 
 int tracer_init(struct tracer *t, struct trace_array *tr)
@@ -6186,11 +6043,10 @@ int tracing_set_tracer(struct trace_array *tr, const char *buf)
 }
 
 static ssize_t
-tracing_set_trace_write(struct file *filp, const char __user *ubuf,
-			size_t cnt, loff_t *ppos)
+tracing_set_trace_write(struct kernfs_open_file *of, char *buf,
+			size_t cnt, loff_t ppos)
 {
-	struct trace_array *tr = filp->private_data;
-	char buf[MAX_TRACER_SIZE+1];
+	struct trace_array *tr = of->priv;
 	char *name;
 	size_t ret;
 	int err;
@@ -6200,68 +6056,50 @@ tracing_set_trace_write(struct file *filp, const char __user *ubuf,
 	if (cnt > MAX_TRACER_SIZE)
 		cnt = MAX_TRACER_SIZE;
 
-	if (copy_from_user(buf, ubuf, cnt))
-		return -EFAULT;
-
-	buf[cnt] = 0;
-
 	name = strim(buf);
 
 	err = tracing_set_tracer(tr, name);
 	if (err)
 		return err;
 
-	*ppos += ret;
-
 	return ret;
 }
 
-static ssize_t
-tracing_nsecs_read(unsigned long *ptr, char __user *ubuf,
-		   size_t cnt, loff_t *ppos)
+static int tracing_nsecs_show(unsigned long *ptr, struct seq_file *seq)
 {
-	char buf[64];
-	int r;
-
-	r = snprintf(buf, sizeof(buf), "%ld\n",
-		     *ptr == (unsigned long)-1 ? -1 : nsecs_to_usecs(*ptr));
-	if (r > sizeof(buf))
-		r = sizeof(buf);
-	return simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+	seq_printf(seq, "%ld\n",
+		   *ptr == (unsigned long)-1 ? -1 : nsecs_to_usecs(*ptr));
+	return 0;
 }
 
-static ssize_t
-tracing_nsecs_write(unsigned long *ptr, const char __user *ubuf,
-		    size_t cnt, loff_t *ppos)
+static ssize_t tracing_nsecs_write(unsigned long *ptr, const char *buf)
 {
 	unsigned long val;
 	int ret;
 
-	ret = kstrtoul_from_user(ubuf, cnt, 10, &val);
+	ret = kstrtoul(buf, 10, &val);
 	if (ret)
 		return ret;
 
 	*ptr = val * 1000;
 
-	return cnt;
+	return 0;
+}
+
+static int tracing_thresh_show(struct seq_file *seq, void *m)
+{
+	return tracing_nsecs_show(&tracing_thresh, seq);
 }
 
 static ssize_t
-tracing_thresh_read(struct file *filp, char __user *ubuf,
-		    size_t cnt, loff_t *ppos)
+tracing_thresh_write(struct kernfs_open_file *of, char *buf,
+		     size_t cnt, loff_t ppos)
 {
-	return tracing_nsecs_read(&tracing_thresh, ubuf, cnt, ppos);
-}
-
-static ssize_t
-tracing_thresh_write(struct file *filp, const char __user *ubuf,
-		     size_t cnt, loff_t *ppos)
-{
-	struct trace_array *tr = filp->private_data;
+	struct trace_array *tr = of->priv;
 	int ret;
 
 	guard(mutex)(&trace_types_lock);
-	ret = tracing_nsecs_write(&tracing_thresh, ubuf, cnt, ppos);
+	ret = tracing_nsecs_write(&tracing_thresh, buf);
 	if (ret < 0)
 		return ret;
 
@@ -6276,22 +6114,26 @@ tracing_thresh_write(struct file *filp, const char __user *ubuf,
 
 #ifdef CONFIG_TRACER_MAX_TRACE
 
-static ssize_t
-tracing_max_lat_read(struct file *filp, char __user *ubuf,
-		     size_t cnt, loff_t *ppos)
+static int tracing_max_lat_show(struct seq_file *seq, void *m)
 {
-	struct trace_array *tr = filp->private_data;
+	struct kernfs_open_file *of = seq->private;
+	struct trace_array *tr = of->priv;
 
-	return tracing_nsecs_read(&tr->max_latency, ubuf, cnt, ppos);
+	return tracing_nsecs_show(&tr->max_latency, seq);
 }
 
 static ssize_t
-tracing_max_lat_write(struct file *filp, const char __user *ubuf,
-		      size_t cnt, loff_t *ppos)
+tracing_max_lat_write(struct kernfs_open_file *of, char *buf,
+		      size_t cnt, loff_t ppos)
 {
-	struct trace_array *tr = filp->private_data;
+	struct trace_array *tr = of->priv;
+	int ret;
 
-	return tracing_nsecs_write(&tr->max_latency, ubuf, cnt, ppos);
+	ret = tracing_nsecs_write(&tr->max_latency, buf);
+	if (ret < 0)
+		return ret;
+
+	return cnt;
 }
 
 #endif
@@ -6321,9 +6163,9 @@ static void close_pipe_on_cpu(struct trace_array *tr, int cpu)
 	}
 }
 
-static int tracing_open_pipe(struct inode *inode, struct file *filp)
+static int tracing_open_pipe(struct kernfs_open_file *of)
 {
-	struct trace_array *tr = inode->i_private;
+	struct trace_array *tr = of->priv;
 	struct trace_iterator *iter;
 	int cpu;
 	int ret;
@@ -6333,7 +6175,7 @@ static int tracing_open_pipe(struct inode *inode, struct file *filp)
 		return ret;
 
 	mutex_lock(&trace_types_lock);
-	cpu = tracing_get_cpu(inode);
+	cpu = tracing_get_cpu(of->kn);
 	ret = open_pipe_on_cpu(tr, cpu);
 	if (ret)
 		goto fail_pipe_on_cpu;
@@ -6367,7 +6209,7 @@ static int tracing_open_pipe(struct inode *inode, struct file *filp)
 	iter->array_buffer = &tr->array_buffer;
 	iter->cpu_file = cpu;
 	mutex_init(&iter->mutex);
-	filp->private_data = iter;
+	of->file->private_data = iter;
 
 	if (iter->trace->pipe_open)
 		iter->trace->pipe_open(iter);
@@ -6389,10 +6231,10 @@ fail_pipe_on_cpu:
 	return ret;
 }
 
-static int tracing_release_pipe(struct inode *inode, struct file *file)
+static int tracing_release_pipe(struct kernfs_open_file *of)
 {
-	struct trace_iterator *iter = file->private_data;
-	struct trace_array *tr = inode->i_private;
+	struct trace_iterator *iter = of->file->private_data;
+	struct trace_array *tr = of->priv;
 
 	mutex_lock(&trace_types_lock);
 
@@ -6412,7 +6254,8 @@ static int tracing_release_pipe(struct inode *inode, struct file *file)
 }
 
 static __poll_t
-trace_poll(struct trace_iterator *iter, struct file *filp, poll_table *poll_table)
+trace_poll(struct trace_iterator *iter, struct kernfs_open_file *of,
+	   poll_table *poll_table)
 {
 	struct trace_array *tr = iter->tr;
 
@@ -6427,15 +6270,15 @@ trace_poll(struct trace_iterator *iter, struct file *filp, poll_table *poll_tabl
 		return EPOLLIN | EPOLLRDNORM;
 	else
 		return ring_buffer_poll_wait(iter->array_buffer->buffer, iter->cpu_file,
-					     filp, poll_table, iter->tr->buffer_percent);
+					     of->file, poll_table, iter->tr->buffer_percent);
 }
 
 static __poll_t
-tracing_poll_pipe(struct file *filp, poll_table *poll_table)
+tracing_poll_pipe(struct kernfs_open_file *of, struct poll_table_struct *pt)
 {
-	struct trace_iterator *iter = filp->private_data;
+	struct trace_iterator *iter = of->file->private_data;
 
-	return trace_poll(iter, filp, poll_table);
+	return trace_poll(iter, of, pt);
 }
 
 /* Must be called with iter->mutex held. */
@@ -6479,10 +6322,10 @@ static int tracing_wait_pipe(struct file *filp)
  * Consumer reader.
  */
 static ssize_t
-tracing_read_pipe(struct file *filp, char __user *ubuf,
-		  size_t cnt, loff_t *ppos)
+tracing_read_pipe(struct kernfs_open_file *of, char *buf,
+		  size_t cnt, loff_t ppos)
 {
-	struct trace_iterator *iter = filp->private_data;
+	struct trace_iterator *iter = of->priv;
 	ssize_t sret;
 
 	/*
@@ -6506,7 +6349,7 @@ tracing_read_pipe(struct file *filp, char __user *ubuf,
 	}
 
 waitagain:
-	sret = tracing_wait_pipe(filp);
+	sret = tracing_wait_pipe(of->file);
 	if (sret <= 0)
 		return sret;
 
@@ -6718,16 +6561,11 @@ out_err:
 	goto out;
 }
 
-static ssize_t
-tracing_entries_read(struct file *filp, char __user *ubuf,
-		     size_t cnt, loff_t *ppos)
+static int tracing_entries_show(struct seq_file *seq, void *m)
 {
-	struct inode *inode = file_inode(filp);
-	struct trace_array *tr = inode->i_private;
-	int cpu = tracing_get_cpu(inode);
-	char buf[64];
-	int r = 0;
-	ssize_t ret;
+	struct kernfs_open_file *of = seq->private;
+	struct trace_array *tr = of->priv;
+	int cpu = tracing_get_cpu(of->kn);
 
 	mutex_lock(&trace_types_lock);
 
@@ -6750,32 +6588,30 @@ tracing_entries_read(struct file *filp, char __user *ubuf,
 
 		if (buf_size_same) {
 			if (!tr->ring_buffer_expanded)
-				r = sprintf(buf, "%lu (expanded: %lu)\n",
-					    size >> 10,
-					    trace_buf_size >> 10);
+				seq_printf(seq, "%lu (expanded: %lu)\n",
+					   size >> 10,
+					   trace_buf_size >> 10);
 			else
-				r = sprintf(buf, "%lu\n", size >> 10);
+				seq_printf(seq, "%lu\n", size >> 10);
 		} else
-			r = sprintf(buf, "X\n");
+			seq_printf(seq, "X\n");
 	} else
-		r = sprintf(buf, "%lu\n", per_cpu_ptr(tr->array_buffer.data, cpu)->entries >> 10);
+		seq_printf(seq, "%lu\n", per_cpu_ptr(tr->array_buffer.data, cpu)->entries >> 10);
 
 	mutex_unlock(&trace_types_lock);
 
-	ret = simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
-	return ret;
+	return 0;
 }
 
 static ssize_t
-tracing_entries_write(struct file *filp, const char __user *ubuf,
-		      size_t cnt, loff_t *ppos)
+tracing_entries_write(struct kernfs_open_file *of, char *buf,
+		      size_t cnt, loff_t ppos)
 {
-	struct inode *inode = file_inode(filp);
-	struct trace_array *tr = inode->i_private;
+	struct trace_array *tr = of->priv;
 	unsigned long val;
 	int ret;
 
-	ret = kstrtoul_from_user(ubuf, cnt, 10, &val);
+	ret = kstrtoul(buf, 10, &val);
 	if (ret)
 		return ret;
 
@@ -6785,11 +6621,9 @@ tracing_entries_write(struct file *filp, const char __user *ubuf,
 
 	/* value is in KB */
 	val <<= 10;
-	ret = tracing_resize_ring_buffer(tr, val, tracing_get_cpu(inode));
+	ret = tracing_resize_ring_buffer(tr, val, tracing_get_cpu(of->kn));
 	if (ret < 0)
 		return ret;
-
-	*ppos += cnt;
 
 	return cnt;
 }
@@ -6833,17 +6667,18 @@ tracing_last_boot_read(struct file *filp, char __user *ubuf, size_t cnt, loff_t 
 	return simple_read_from_buffer(ubuf, cnt, ppos, buf, seq_buf_used(&seq));
 }
 
-static int tracing_buffer_meta_open(struct inode *inode, struct file *filp)
+static int tracing_buffer_meta_open(struct kernfs_open_file *of)
 {
-	struct trace_array *tr = inode->i_private;
-	int cpu = tracing_get_cpu(inode);
+	struct trace_array *tr = of->priv;
+	int cpu = tracing_get_cpu(of->kn);
 	int ret;
 
 	ret = tracing_check_open_get_tr(tr);
 	if (ret)
 		return ret;
 
-	ret = ring_buffer_meta_seq_init(filp, tr->array_buffer.buffer, cpu);
+	/* TODO: This is wrong. Just use kernfs seq ops directly */
+	ret = ring_buffer_meta_seq_init(of->file, tr->array_buffer.buffer, cpu);
 	if (ret < 0)
 		__trace_array_put(tr);
 	return ret;
@@ -7191,9 +7026,9 @@ struct ftrace_buffer_info {
 };
 
 #ifdef CONFIG_TRACER_SNAPSHOT
-static int tracing_snapshot_open(struct inode *inode, struct file *file)
+static int tracing_snapshot_open(struct kernfs_open_file *of)
 {
-	struct trace_array *tr = inode->i_private;
+	struct trace_array *tr = of->priv;
 	struct trace_iterator *iter;
 	struct seq_file *m;
 	int ret;
@@ -7202,8 +7037,8 @@ static int tracing_snapshot_open(struct inode *inode, struct file *file)
 	if (ret)
 		return ret;
 
-	if (file->f_mode & FMODE_READ) {
-		iter = __tracing_open(inode, file, true);
+	if (of->file->f_mode & FMODE_READ) {
+		iter = __tracing_open(of, true);
 		if (IS_ERR(iter))
 			ret = PTR_ERR(iter);
 	} else {
@@ -7221,9 +7056,9 @@ static int tracing_snapshot_open(struct inode *inode, struct file *file)
 
 		iter->tr = tr;
 		iter->array_buffer = &tr->max_buffer;
-		iter->cpu_file = tracing_get_cpu(inode);
+		iter->cpu_file = tracing_get_cpu(of->kn);
 		m->private = iter;
-		file->private_data = m;
+		of->file->private_data = m;
 	}
 out:
 	if (ret < 0)
@@ -7370,32 +7205,29 @@ static int snapshot_raw_open(struct inode *inode, struct file *filp)
 #endif /* CONFIG_TRACER_SNAPSHOT */
 
 
-static const struct file_operations tracing_thresh_fops = {
+static const struct kernfs_ops tracing_thresh_fops = {
 	.open		= tracing_open_generic,
-	.read		= tracing_thresh_read,
+	.seq_show	= tracing_thresh_show,
 	.write		= tracing_thresh_write,
-	.llseek		= generic_file_llseek,
 };
 
 #ifdef CONFIG_TRACER_MAX_TRACE
-static const struct file_operations tracing_max_lat_fops = {
+static const struct kernfs_ops tracing_max_lat_fops = {
 	.open		= tracing_open_generic_tr,
-	.read		= tracing_max_lat_read,
+	.seq_show	= tracing_max_lat_show,
 	.write		= tracing_max_lat_write,
-	.llseek		= generic_file_llseek,
 	.release	= tracing_release_generic_tr,
 };
 #endif
 
-static const struct file_operations set_tracer_fops = {
+static const struct kernfs_ops set_tracer_fops = {
 	.open		= tracing_open_generic_tr,
-	.read		= tracing_set_trace_read,
+	.seq_show	= tracing_set_trace_show,
 	.write		= tracing_set_trace_write,
-	.llseek		= generic_file_llseek,
 	.release	= tracing_release_generic_tr,
 };
 
-static const struct file_operations tracing_pipe_fops = {
+static const struct kernfs_ops tracing_pipe_fops = {
 	.open		= tracing_open_pipe,
 	.poll		= tracing_poll_pipe,
 	.read		= tracing_read_pipe,
@@ -7403,62 +7235,61 @@ static const struct file_operations tracing_pipe_fops = {
 	.release	= tracing_release_pipe,
 };
 
-static const struct file_operations tracing_entries_fops = {
+static const struct kernfs_ops tracing_entries_fops = {
 	.open		= tracing_open_generic_tr,
-	.read		= tracing_entries_read,
+	.seq_show	= tracing_entries_show,
 	.write		= tracing_entries_write,
-	.llseek		= generic_file_llseek,
 	.release	= tracing_release_generic_tr,
 };
 
-static const struct file_operations tracing_buffer_meta_fops = {
+static const struct kernfs_ops tracing_buffer_meta_fops = {
 	.open		= tracing_buffer_meta_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= tracing_seq_release,
 };
 
-static const struct file_operations tracing_total_entries_fops = {
+static const struct kernfs_ops tracing_total_entries_fops = {
 	.open		= tracing_open_generic_tr,
 	.read		= tracing_total_entries_read,
 	.llseek		= generic_file_llseek,
 	.release	= tracing_release_generic_tr,
 };
 
-static const struct file_operations tracing_free_buffer_fops = {
+static const struct kernfs_ops tracing_free_buffer_fops = {
 	.open		= tracing_open_generic_tr,
 	.write		= tracing_free_buffer_write,
 	.release	= tracing_free_buffer_release,
 };
 
-static const struct file_operations tracing_mark_fops = {
+static const struct kernfs_ops tracing_mark_fops = {
 	.open		= tracing_mark_open,
 	.write		= tracing_mark_write,
 	.release	= tracing_release_generic_tr,
 };
 
-static const struct file_operations tracing_mark_raw_fops = {
+static const struct kernfs_ops tracing_mark_raw_fops = {
 	.open		= tracing_mark_open,
 	.write		= tracing_mark_raw_write,
 	.release	= tracing_release_generic_tr,
 };
 
-static const struct file_operations trace_clock_fops = {
+static const struct kernfs_ops trace_clock_fops = {
 	.open		= tracing_clock_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
-	.release	= tracing_single_release_tr,
+	.release	= tracing_release_file_tr,
 	.write		= tracing_clock_write,
 };
 
-static const struct file_operations trace_time_stamp_mode_fops = {
+static const struct kernfs_ops trace_time_stamp_mode_fops = {
 	.open		= tracing_time_stamp_mode_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= tracing_single_release_tr,
 };
 
-static const struct file_operations last_boot_fops = {
+static const struct kernfs_ops last_boot_fops = {
 	.open		= tracing_open_generic_tr,
 	.read		= tracing_last_boot_read,
 	.llseek		= generic_file_llseek,
@@ -7466,7 +7297,7 @@ static const struct file_operations last_boot_fops = {
 };
 
 #ifdef CONFIG_TRACER_SNAPSHOT
-static const struct file_operations snapshot_fops = {
+static const struct kernfs_ops snapshot_fops = {
 	.open		= tracing_snapshot_open,
 	.read		= seq_read,
 	.write		= tracing_snapshot_write,
@@ -7474,7 +7305,7 @@ static const struct file_operations snapshot_fops = {
 	.release	= tracing_snapshot_release,
 };
 
-static const struct file_operations snapshot_raw_fops = {
+static const struct kernfs_ops snapshot_raw_fops = {
 	.open		= snapshot_raw_open,
 	.read		= tracing_buffers_read,
 	.release	= tracing_buffers_release,
@@ -7562,7 +7393,7 @@ trace_min_max_read(struct file *filp, char __user *ubuf, size_t cnt, loff_t *ppo
 	return simple_read_from_buffer(ubuf, cnt, ppos, buf, len);
 }
 
-const struct file_operations trace_min_max_fops = {
+const struct kernfs_ops trace_min_max_fops = {
 	.open		= tracing_open_generic,
 	.read		= trace_min_max_read,
 	.write		= trace_min_max_write,
@@ -7834,7 +7665,7 @@ static int tracing_err_log_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static const struct file_operations tracing_err_log_fops = {
+static const struct kernfs_ops tracing_err_log_fops = {
 	.open           = tracing_err_log_open,
 	.write		= tracing_err_log_write,
 	.read           = seq_read,
@@ -8298,7 +8129,7 @@ static int tracing_buffers_mmap(struct file *filp, struct vm_area_struct *vma)
 	return ret;
 }
 
-static const struct file_operations tracing_buffers_fops = {
+static const struct kernfs_ops tracing_buffers_fops = {
 	.open		= tracing_buffers_open,
 	.read		= tracing_buffers_read,
 	.poll		= tracing_buffers_poll,
@@ -8373,7 +8204,7 @@ tracing_stats_read(struct file *filp, char __user *ubuf,
 	return count;
 }
 
-static const struct file_operations tracing_stats_fops = {
+static const struct kernfs_ops tracing_stats_fops = {
 	.open		= tracing_open_generic_tr,
 	.read		= tracing_stats_read,
 	.llseek		= generic_file_llseek,
@@ -8412,7 +8243,7 @@ tracing_read_dyn_info(struct file *filp, char __user *ubuf,
 	return ret;
 }
 
-static const struct file_operations tracing_dyn_info_fops = {
+static const struct kernfs_ops tracing_dyn_info_fops = {
 	.open		= tracing_open_generic,
 	.read		= tracing_read_dyn_info,
 	.llseek		= generic_file_llseek,
@@ -8583,7 +8414,7 @@ static __init int register_snapshot_cmd(void)
 static inline __init int register_snapshot_cmd(void) { return 0; }
 #endif /* defined(CONFIG_TRACER_SNAPSHOT) && defined(CONFIG_DYNAMIC_FTRACE) */
 
-static struct dentry *tracing_get_dentry(struct trace_array *tr)
+static struct kernfs_node *tracing_dir(struct trace_array *tr)
 {
 	if (WARN_ON(!tr->dir))
 		return ERR_PTR(-ENODEV);
@@ -8596,14 +8427,14 @@ static struct dentry *tracing_get_dentry(struct trace_array *tr)
 	return tr->dir;
 }
 
-static struct dentry *tracing_dentry_percpu(struct trace_array *tr, int cpu)
+static struct kernfs_node *tracing_percpu_dir(struct trace_array *tr, int cpu)
 {
-	struct dentry *d_tracer;
+	struct kernfs_node *d_tracer;
 
 	if (tr->percpu_dir)
 		return tr->percpu_dir;
 
-	d_tracer = tracing_get_dentry(tr);
+	d_tracer = tracing_dir(tr);
 	if (IS_ERR(d_tracer))
 		return NULL;
 
@@ -8615,22 +8446,22 @@ static struct dentry *tracing_dentry_percpu(struct trace_array *tr, int cpu)
 	return tr->percpu_dir;
 }
 
-static struct dentry *
-trace_create_cpu_file(const char *name, umode_t mode, struct dentry *parent,
-		      void *data, long cpu, const struct file_operations *fops)
+static struct kernfs_node *
+trace_create_cpu_file(const char *name, umode_t mode, struct kernfs_node *parent,
+		      void *data, long cpu, const struct kernfs_ops *fops)
 {
-	struct dentry *ret = trace_create_file(name, mode, parent, data, fops);
+	struct kernfs_node *ret = trace_create_file(name, mode, parent, data, fops);
 
 	if (ret) /* See tracing_get_cpu() */
-		d_inode(ret)->i_cdev = (void *)(cpu + 1);
+		ret->priv = (void *)(cpu + 1);
 	return ret;
 }
 
 static void
 tracing_init_tracefs_percpu(struct trace_array *tr, long cpu)
 {
-	struct dentry *d_percpu = tracing_dentry_percpu(tr, cpu);
-	struct dentry *d_cpu;
+	struct kernfs_node *d_percpu = tracing_percpu_dir(tr, cpu);
+	struct kernfs_node *d_cpu;
 	char cpu_dir[30]; /* 30 characters should be more than enough */
 
 	if (!d_percpu)
@@ -8744,7 +8575,7 @@ static int tracing_release_options(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static const struct file_operations trace_options_fops = {
+static const struct kernfs_ops trace_options_fops = {
 	.open = tracing_open_options,
 	.read = trace_options_read,
 	.write = trace_options_write,
@@ -8837,20 +8668,20 @@ trace_options_core_write(struct file *filp, const char __user *ubuf, size_t cnt,
 	return cnt;
 }
 
-static const struct file_operations trace_options_core_fops = {
+static const struct kernfs_ops trace_options_core_fops = {
 	.open = tracing_open_generic,
 	.read = trace_options_core_read,
 	.write = trace_options_core_write,
 	.llseek = generic_file_llseek,
 };
 
-struct dentry *trace_create_file(const char *name,
-				 umode_t mode,
-				 struct dentry *parent,
-				 void *data,
-				 const struct file_operations *fops)
+struct kernfs_node *trace_create_file(const char *name,
+				      umode_t mode,
+				      struct kernfs_node *parent,
+				      void *data,
+				      const struct kernfs_ops *fops)
 {
-	struct dentry *ret;
+	struct kernfs_node *ret;
 
 	ret = tracefs_create_file(name, mode, parent, data, fops);
 	if (!ret)
@@ -8860,14 +8691,14 @@ struct dentry *trace_create_file(const char *name,
 }
 
 
-static struct dentry *trace_options_init_dentry(struct trace_array *tr)
+static struct kernfs_node *trace_options_init_dir(struct trace_array *tr)
 {
-	struct dentry *d_tracer;
+	struct kernfs_node *d_tracer;
 
 	if (tr->options)
 		return tr->options;
 
-	d_tracer = tracing_get_dentry(tr);
+	d_tracer = tracing_dir(tr);
 	if (IS_ERR(d_tracer))
 		return NULL;
 
@@ -8886,9 +8717,9 @@ create_trace_option_file(struct trace_array *tr,
 			 struct tracer_flags *flags,
 			 struct tracer_opt *opt)
 {
-	struct dentry *t_options;
+	struct kernfs_node *t_options;
 
-	t_options = trace_options_init_dentry(tr);
+	t_options = trace_options_init_dir(tr);
 	if (!t_options)
 		return;
 
@@ -8968,7 +8799,7 @@ create_trace_option_core_file(struct trace_array *tr,
 {
 	struct dentry *t_options;
 
-	t_options = trace_options_init_dentry(tr);
+	t_options = trace_options_init_dir(tr);
 	if (!t_options)
 		return NULL;
 
@@ -8983,7 +8814,7 @@ static void create_trace_options_dir(struct trace_array *tr)
 	bool top_level = tr == &global_trace;
 	int i;
 
-	t_options = trace_options_init_dentry(tr);
+	t_options = trace_options_init_dir(tr);
 	if (!t_options)
 		return;
 
@@ -9044,7 +8875,7 @@ rb_simple_write(struct file *filp, const char __user *ubuf,
 	return cnt;
 }
 
-static const struct file_operations rb_simple_fops = {
+static const struct kernfs_ops rb_simple_fops = {
 	.open		= tracing_open_generic_tr,
 	.read		= rb_simple_read,
 	.write		= rb_simple_write,
@@ -9088,7 +8919,7 @@ buffer_percent_write(struct file *filp, const char __user *ubuf,
 	return cnt;
 }
 
-static const struct file_operations buffer_percent_fops = {
+static const struct kernfs_ops buffer_percent_fops = {
 	.open		= tracing_open_generic_tr,
 	.read		= buffer_percent_read,
 	.write		= buffer_percent_write,
@@ -9185,7 +9016,7 @@ buffer_subbuf_size_write(struct file *filp, const char __user *ubuf,
 	return cnt;
 }
 
-static const struct file_operations buffer_subbuf_size_fops = {
+static const struct kernfs_ops buffer_subbuf_size_fops = {
 	.open		= tracing_open_generic_tr,
 	.read		= buffer_subbuf_size_read,
 	.write		= buffer_subbuf_size_write,
@@ -9626,8 +9457,7 @@ static __init void create_trace_instances(struct dentry *d_tracer)
 {
 	struct trace_array *tr;
 
-	trace_instance_dir = tracefs_create_instance_dir("instances", d_tracer,
-							 instance_mkdir,
+	trace_instance_dir = tracefs_create_instance_dir(instance_mkdir,
 							 instance_rmdir);
 	if (MEM_FAIL(!trace_instance_dir, "Failed to create instances directory\n"))
 		return;
@@ -9645,7 +9475,7 @@ static __init void create_trace_instances(struct dentry *d_tracer)
 }
 
 static void
-init_tracer_tracefs(struct trace_array *tr, struct dentry *d_tracer)
+init_tracer_tracefs(struct trace_array *tr, struct kernfs_node *d_tracer)
 {
 	int cpu;
 
@@ -9704,7 +9534,8 @@ init_tracer_tracefs(struct trace_array *tr, struct dentry *d_tracer)
 	create_trace_options_dir(tr);
 
 #ifdef CONFIG_TRACER_MAX_TRACE
-	trace_create_maxlat_file(tr, d_tracer);
+	trace_create_file("tracing_max_latency", TRACE_MODE_WRITE,
+			  d_tracer, tr, &tracing_max_lat_fops);
 #endif
 
 	if (ftrace_create_function_files(tr, d_tracer))

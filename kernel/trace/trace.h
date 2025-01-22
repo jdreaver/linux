@@ -339,9 +339,7 @@ struct trace_array {
 	unsigned int		snapshot;
 	unsigned long		max_latency;
 #ifdef CONFIG_FSNOTIFY
-	struct dentry		*d_max_latency;
-	struct work_struct	fsnotify_work;
-	struct irq_work		fsnotify_irqwork;
+	struct kernfs_node	*d_max_latency;
 #endif
 #endif
 	/* The below is for memory mapped ring buffer */
@@ -387,9 +385,9 @@ struct trace_array {
 	raw_spinlock_t		start_lock;
 	const char		*system_names;
 	struct list_head	err_log;
-	struct dentry		*dir;
-	struct dentry		*options;
-	struct dentry		*percpu_dir;
+	struct kernfs_node	*dir;
+	struct kernfs_node	*options;
+	struct kernfs_node	*percpu_dir;
 	struct eventfs_inode	*event_dir;
 	struct trace_options	*topts;
 	struct list_head	systems;
@@ -641,21 +639,21 @@ int tracing_is_enabled(void);
 void tracing_reset_online_cpus(struct array_buffer *buf);
 void tracing_reset_all_online_cpus(void);
 void tracing_reset_all_online_cpus_unlocked(void);
-int tracing_open_generic(struct inode *inode, struct file *filp);
-int tracing_open_generic_tr(struct inode *inode, struct file *filp);
-int tracing_release_generic_tr(struct inode *inode, struct file *file);
-int tracing_open_file_tr(struct inode *inode, struct file *filp);
-int tracing_release_file_tr(struct inode *inode, struct file *filp);
-int tracing_single_release_file_tr(struct inode *inode, struct file *filp);
+int tracing_open_generic(struct kernfs_open_file *of);
+int tracing_open_generic_tr(struct kernfs_open_file *of);
+void tracing_release_generic_tr(struct kernfs_open_file *of);
+int tracing_open_file_tr(struct kernfs_open_file *of);
+void tracing_release_file_tr(struct kernfs_open_file *of);
+int tracing_single_release_file_tr(struct kernfs_open_file *of);
 bool tracing_is_disabled(void);
 bool tracer_tracing_is_on(struct trace_array *tr);
 void tracer_tracing_on(struct trace_array *tr);
 void tracer_tracing_off(struct trace_array *tr);
-struct dentry *trace_create_file(const char *name,
-				 umode_t mode,
-				 struct dentry *parent,
-				 void *data,
-				 const struct file_operations *fops);
+struct kernfs_node *trace_create_file(const char *name,
+				      umode_t mode,
+				      struct kernfs_node *parent,
+				      void *data,
+				      const struct kernfs_ops *fops);
 
 int tracing_init_dentry(void);
 
