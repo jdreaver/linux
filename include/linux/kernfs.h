@@ -270,11 +270,12 @@ struct kernfs_open_file {
 
 struct kernfs_ops {
 	/*
-	 * Optional open/release methods.  Both are called with
+	 * Optional open/release/flush methods.  All called with
 	 * @of->seq_file populated.
 	 */
 	int (*open)(struct kernfs_open_file *of);
 	void (*release)(struct kernfs_open_file *of);
+	void (*flush)(struct kernfs_open_file *of);
 
 	/*
 	 * Read is handled by either seq_file or raw_read().

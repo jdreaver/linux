@@ -770,6 +770,22 @@ static int kernfs_fop_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+static int kernfs_fop_flush(struct file *file, fl_owner_t id)
+{
+	struct kernfs_open_file *of = kernfs_of(file);
+	struct kernfs_node *kn = of->kn;
+
+	if (kn->attr.ops->flush) {
+		struct mutex *mutex;
+
+		mutex = kernfs_open_file_mutex_lock(kn);
+		kn->attr.ops->flush(of);
+		mutex_unlock(mutex);
+	}
+
+	return 0;
+}
+
 bool kernfs_should_drain_open_files(struct kernfs_node *kn)
 {
 	struct kernfs_open_node *on;
@@ -996,6 +1012,7 @@ const struct file_operations kernfs_file_fops = {
 	.mmap		= kernfs_fop_mmap,
 	.open		= kernfs_fop_open,
 	.release	= kernfs_fop_release,
+	.flush		= kernfs_fop_flush,
 	.poll		= kernfs_fop_poll,
 	.fsync		= noop_fsync,
 	.splice_read	= copy_splice_read,
