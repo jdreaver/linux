@@ -906,6 +906,27 @@ static loff_t kernfs_fop_llseek(struct file *file, loff_t offset, int whence)
 	return ret;
 }
 
+static ssize_t kernfs_fop_splice_read(struct file *in, loff_t *ppos,
+				      struct pipe_inode_info *pipe,
+				      size_t len, unsigned int flags)
+{
+	struct kernfs_open_file *of = kernfs_of(in);
+	const struct kernfs_ops *ops;
+	ssize_t ret;
+
+	mutex_lock(&of->mutex);
+
+	ops = kernfs_ops(of->kn);
+	if (ops->splice_read)
+		ret = ops->splice_read(in, ppos, pipe, len, flags);
+	else
+		ret = copy_splice_read(in, ppos, pipe, len, flags);
+
+	mutex_unlock(&of->mutex);
+
+	return ret;
+}
+
 static void kernfs_notify_workfn(struct work_struct *work)
 {
 	struct kernfs_node *kn;
@@ -1015,7 +1036,7 @@ const struct file_operations kernfs_file_fops = {
 	.flush		= kernfs_fop_flush,
 	.poll		= kernfs_fop_poll,
 	.fsync		= noop_fsync,
-	.splice_read	= copy_splice_read,
+	.splice_read	= kernfs_fop_splice_read,
 	.splice_write	= iter_file_splice_write,
 };
 

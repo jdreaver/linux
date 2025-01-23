@@ -320,6 +320,15 @@ struct kernfs_ops {
 
 	int (*mmap)(struct kernfs_open_file *of, struct vm_area_struct *vma);
 	loff_t (*llseek)(struct kernfs_open_file *of, loff_t offset, int whence);
+
+	/*
+	 * Operations below are "bare" VFS (they don't use kernfs_open_file).
+	 * Perhaps once they have multiple users we can find the right
+	 * abstraction to use.
+         */
+	ssize_t (*splice_read)(struct file *in, loff_t *ppos,
+			       struct pipe_inode_info *pipe, size_t len,
+			       unsigned int flags);
 };
 
 /*
