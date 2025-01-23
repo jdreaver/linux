@@ -927,6 +927,24 @@ static ssize_t kernfs_fop_splice_read(struct file *in, loff_t *ppos,
 	return ret;
 }
 
+static long kernfs_fop_unlocked_ioctl(struct file *file, unsigned int cmd,
+				       unsigned long arg)
+{
+	struct kernfs_open_file *of = kernfs_of(file);
+	struct kernfs_node *kn = of->kn;
+	long ret = 0;
+
+	if (kn->attr.ops->flush) {
+		struct mutex *mutex;
+
+		mutex = kernfs_open_file_mutex_lock(kn);
+		ret = kn->attr.ops->unlocked_ioctl(file, cmd, arg);
+		mutex_unlock(mutex);
+	}
+
+	return ret;
+}
+
 static void kernfs_notify_workfn(struct work_struct *work)
 {
 	struct kernfs_node *kn;
@@ -1038,6 +1056,7 @@ const struct file_operations kernfs_file_fops = {
 	.fsync		= noop_fsync,
 	.splice_read	= kernfs_fop_splice_read,
 	.splice_write	= iter_file_splice_write,
+	.unlocked_ioctl	= kernfs_fop_unlocked_ioctl,
 };
 
 /**

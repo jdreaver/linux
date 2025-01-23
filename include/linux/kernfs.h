@@ -329,6 +329,8 @@ struct kernfs_ops {
 	ssize_t (*splice_read)(struct file *in, loff_t *ppos,
 			       struct pipe_inode_info *pipe, size_t len,
 			       unsigned int flags);
+	long (*unlocked_ioctl)(struct file *file, unsigned int cmd,
+			       unsigned long arg);
 };
 
 /*
