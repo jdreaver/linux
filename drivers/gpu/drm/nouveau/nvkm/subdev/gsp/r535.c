@@ -2172,7 +2172,7 @@ r535_gsp_msg_libos_print(void *priv, u32 fn, void *repv, u32 repc)
 static struct debugfs_node *create_debugfs(struct nvkm_gsp *gsp, const char *name,
 				     struct debugfs_blob_wrapper *blob)
 {
-	struct dentry *dent;
+	struct debugfs_node *dent;
 
 	dent = debugfs_create_blob(name, 0444, gsp->debugfs.parent, blob);
 	if (IS_ERR(dent)) {
@@ -2187,7 +2187,7 @@ static struct debugfs_node *create_debugfs(struct nvkm_gsp *gsp, const char *nam
 	 *
 	 * [1] https://lore.kernel.org/r/linux-fsdevel/20240207200619.3354549-1-ttabi@nvidia.com/
 	 */
-	i_size_write(d_inode(dent), blob->size);
+	i_size_write(debugfs_node_inode(dent), blob->size);
 
 	return dent;
 }
@@ -2264,10 +2264,10 @@ r535_gsp_libos_debugfs_init(struct nvkm_gsp *gsp)
 		goto error;
 	}
 
-	i_size_write(d_inode(gsp->debugfs.init), gsp->blob_init.size);
-	i_size_write(d_inode(gsp->debugfs.intr), gsp->blob_intr.size);
-	i_size_write(d_inode(gsp->debugfs.rm), gsp->blob_rm.size);
-	i_size_write(d_inode(gsp->debugfs.pmu), gsp->blob_pmu.size);
+	i_size_write(debugfs_node_inode(gsp->debugfs.init), gsp->blob_init.size);
+	i_size_write(debugfs_node_inode(gsp->debugfs.intr), gsp->blob_intr.size);
+	i_size_write(debugfs_node_inode(gsp->debugfs.rm), gsp->blob_rm.size);
+	i_size_write(debugfs_node_inode(gsp->debugfs.pmu), gsp->blob_pmu.size);
 
 	r535_gsp_msg_ntfy_add(gsp, NV_VGPU_MSG_EVENT_UCODE_LIBOS_PRINT,
 			      r535_gsp_msg_libos_print, gsp);
@@ -2793,12 +2793,12 @@ static bool is_empty(const struct debugfs_blob_wrapper *b)
  * To preserve the logging buffers, the buffers need to be copied, but only
  * if they actually have data.
  */
-static int r535_gsp_copy_log(struct dentry *parent,
+static int r535_gsp_copy_log(struct debugfs_node *parent,
 			     const char *name,
 			     const struct debugfs_blob_wrapper *s,
 			     struct debugfs_blob_wrapper *t)
 {
-	struct dentry *dent;
+	struct debugfs_node *dent;
 	void *p;
 
 	if (is_empty(s))
@@ -2819,7 +2819,7 @@ static int r535_gsp_copy_log(struct dentry *parent,
 		return PTR_ERR(dent);
 	}
 
-	i_size_write(d_inode(dent), t->size);
+	i_size_write(debugfs_node_inode(dent), t->size);
 
 	return 0;
 }

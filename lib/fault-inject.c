@@ -262,7 +262,7 @@ struct debugfs_node *fault_create_debugfs_attr(const char *name,
 	debugfs_create_xul("reject-end", mode, dir, &attr->reject_end);
 #endif /* CONFIG_FAULT_INJECTION_STACKTRACE_FILTER */
 
-	attr->dname = dget(dir);
+	attr->dname = debugfs_node_get(dir);
 	return dir;
 }
 EXPORT_SYMBOL_GPL(fault_create_debugfs_attr);

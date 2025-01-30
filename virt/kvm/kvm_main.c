@@ -1017,7 +1017,7 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, const char *fdname)
 	dent = debugfs_lookup(dir_name, kvm_debugfs_dir);
 	if (dent) {
 		pr_warn_ratelimited("KVM: debugfs: duplicate directory %s\n", dir_name);
-		dput(dent);
+		debugfs_node_put(dent);
 		mutex_unlock(&kvm_debugfs_lock);
 		return 0;
 	}
@@ -6216,7 +6216,8 @@ static void kvm_uevent_notify_change(unsigned int type, struct kvm *kvm)
 		char *tmp, *p = kmalloc(PATH_MAX, GFP_KERNEL);
 
 		if (p) {
-			tmp = dentry_path_raw(kvm->debugfs_dentry, p, PATH_MAX);
+			tmp = debugfs_node_path_raw(kvm->debugfs_dentry, p,
+						    PATH_MAX);
 			if (!IS_ERR(tmp))
 				add_uevent_var(env, "STATS_PATH=%s", tmp);
 			kfree(p);
