@@ -39,13 +39,13 @@ struct adf_heartbeat {
 		void *virt_addr;
 	} dma;
 	struct {
-		struct dentry *base_dir;
-		struct dentry *status;
-		struct dentry *cfg;
-		struct dentry *sent;
-		struct dentry *failed;
+		struct debugfs_node *base_dir;
+		struct debugfs_node *status;
+		struct debugfs_node *cfg;
+		struct debugfs_node *sent;
+		struct debugfs_node *failed;
 #ifdef CONFIG_CRYPTO_DEV_QAT_ERROR_INJECTION
-		struct dentry *inject_error;
+		struct debugfs_node *inject_error;
 #endif
 	} dbgfs;
 };

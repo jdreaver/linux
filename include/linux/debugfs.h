@@ -338,7 +338,7 @@ static inline struct debugfs_node *debugfs_create_symlink(const char *name,
 }
 
 static inline struct dentry *debugfs_create_automount(const char *name,
-					struct debugfs_node *parent,
+					struct dentry *parent,
 					debugfs_automount_t f,
 					void *data)
 {
@@ -366,7 +366,7 @@ static inline int debugfs_file_get(struct debugfs_node *debugfs_node)
 static inline void debugfs_file_put(struct debugfs_node *debugfs_node)
 { }
 
-struct debugfs_node *debugfs_node_from_dentry(struct debugfs_node *dentry)
+struct debugfs_node *debugfs_node_from_dentry(struct dentry *dentry)
 {
 	return ERR_PTR(-ENODEV);
 }

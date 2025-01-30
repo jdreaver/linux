@@ -1008,26 +1008,27 @@ static const struct file_operations fops_spectral_fft_period = {
 /* Relay interface */
 /*******************/
 
-static struct debugfs_node *create_buf_file_handler(const char *filename,
-					      struct debugfs_node *parent,
+static struct dentry *create_buf_file_handler(const char *filename,
+					      struct dentry *parent,
 					      umode_t mode,
 					      struct rchan_buf *buf,
 					      int *is_global)
 {
+	struct debugfs_node *parent_node = debugfs_node_from_dentry(parent);
 	struct debugfs_node *buf_file;
 
-	buf_file = debugfs_create_file(filename, mode, parent, buf,
+	buf_file = debugfs_create_file(filename, mode, parent_node, buf,
 				       &relay_file_operations);
 	if (IS_ERR(buf_file))
 		return NULL;
 
 	*is_global = 1;
-	return buf_file;
+	return debugfs_node_dentry(buf_file);
 }
 
-static int remove_buf_file_handler(struct debugfs_node *dentry)
+static int remove_buf_file_handler(struct dentry *dentry)
 {
-	debugfs_remove(dentry);
+	debugfs_remove(debugfs_node_from_dentry(dentry));
 
 	return 0;
 }
@@ -1053,8 +1054,9 @@ EXPORT_SYMBOL(ath9k_cmn_spectral_deinit_debug);
 void ath9k_cmn_spectral_init_debug(struct ath_spec_scan_priv *spec_priv,
 				   struct debugfs_node *debugfs_phy)
 {
+	struct dentry *debugfs_phy_dent = debugfs_node_dentry(debugfs_phy);
 	spec_priv->rfs_chan_spec_scan = relay_open("spectral_scan",
-					    debugfs_phy,
+					    debugfs_phy_dent,
 					    1024, 256, &rfs_spec_scan_cb,
 					    NULL);
 	if (!spec_priv->rfs_chan_spec_scan)

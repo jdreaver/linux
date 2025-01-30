@@ -15,20 +15,25 @@
 #define T7XX_TRC_SUB_BUFF_SIZE		131072
 #define T7XX_TRC_N_SUB_BUFF		32
 
-static struct debugfs_node *t7xx_trace_create_buf_file_handler(const char *filename,
-							 struct debugfs_node *parent,
+static struct dentry *t7xx_trace_create_buf_file_handler(const char *filename,
+							 struct dentry *parent,
 							 umode_t mode,
 							 struct rchan_buf *buf,
 							 int *is_global)
 {
+	struct debugfs_node *parent_node = debugfs_node_from_dentry(parent);
+	struct debugfs_node *node;
+
 	*is_global = 1;
-	return debugfs_create_file(filename, mode, parent, buf,
+	node = debugfs_create_file(filename, mode, parent_node, buf,
 				   &relay_file_operations);
+
+	return debugfs_node_dentry(node);
 }
 
-static int t7xx_trace_remove_buf_file_handler(struct debugfs_node *dentry)
+static int t7xx_trace_remove_buf_file_handler(struct dentry *dentry)
 {
-	debugfs_remove(dentry);
+	debugfs_remove(debugfs_node_from_dentry(dentry));
 	return 0;
 }
 
@@ -79,6 +84,7 @@ static void t7xx_port_trace_md_state_notify(struct t7xx_port *port, unsigned int
 	struct rchan *relaych = port->log.relaych;
 	struct debugfs_node *debugfs_wwan_dir;
 	struct debugfs_node *debugfs_dir;
+	struct dentry *debugfs_dir_dentry;
 
 	if (state != MD_STATE_READY || relaych)
 		return;
@@ -94,8 +100,10 @@ static void t7xx_port_trace_md_state_notify(struct t7xx_port *port, unsigned int
 		return;
 	}
 
-	relaych = relay_open("relay_ch", debugfs_dir, T7XX_TRC_SUB_BUFF_SIZE,
-			     T7XX_TRC_N_SUB_BUFF, &relay_callbacks, NULL);
+	debugfs_dir_dentry = debugfs_node_dentry(debugfs_dir);
+	relaych = relay_open("relay_ch", debugfs_dir_dentry,
+			     T7XX_TRC_SUB_BUFF_SIZE, T7XX_TRC_N_SUB_BUFF,
+			     &relay_callbacks, NULL);
 	if (!relaych)
 		goto err_rm_debugfs_dir;
 
