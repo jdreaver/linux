@@ -217,7 +217,7 @@ enum nsim_resource_id {
 struct nsim_dev_health {
 	struct devlink_health_reporter *empty_reporter;
 	struct devlink_health_reporter *dummy_reporter;
-	struct dentry *ddir;
+	struct debugfs_node *ddir;
 	char *recovered_break_msg;
 	u32 binary_len;
 	bool fail_recover;
@@ -235,7 +235,7 @@ struct nsim_dev_hwstats_netdev {
 };
 
 struct nsim_dev_hwstats {
-	struct dentry *ddir;
+	struct debugfs_node *ddir;
 	struct dentry *l3_ddir;
 
 	struct mutex hwsdev_list_lock; /* protects hwsdev list(s) */
@@ -275,8 +275,8 @@ struct nsim_dev_port {
 	struct devlink_port devlink_port;
 	unsigned int port_index;
 	enum nsim_dev_port_type port_type;
-	struct dentry *ddir;
-	struct dentry *rate_parent;
+	struct debugfs_node *ddir;
+	struct debugfs_node *rate_parent;
 	char *parent_name;
 	struct netdevsim *ns;
 };
@@ -298,10 +298,10 @@ struct nsim_dev {
 	struct nsim_bus_dev *nsim_bus_dev;
 	struct nsim_fib_data *fib_data;
 	struct nsim_trap_data *trap_data;
-	struct dentry *ddir;
-	struct dentry *ports_ddir;
-	struct dentry *take_snapshot;
-	struct dentry *nodes_ddir;
+	struct debugfs_node *ddir;
+	struct debugfs_node *ports_ddir;
+	struct debugfs_node *take_snapshot;
+	struct debugfs_node *nodes_ddir;
 
 	struct nsim_vf_config *vfconfigs;
 
@@ -309,7 +309,7 @@ struct nsim_dev {
 	bool bpf_bind_accept;
 	bool bpf_bind_verifier_accept;
 	u32 bpf_bind_verifier_delay;
-	struct dentry *ddir_bpf_bound_progs;
+	struct debugfs_node *ddir_bpf_bound_progs;
 	u32 prog_id_gen;
 	struct list_head bpf_bound_progs;
 	struct list_head bpf_bound_maps;

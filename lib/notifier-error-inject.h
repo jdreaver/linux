@@ -18,7 +18,7 @@ struct notifier_err_inject {
 	/* The last slot must be terminated with zero sentinel */
 };
 
-extern struct dentry *notifier_err_inject_dir;
+extern struct debugfs_node *notifier_err_inject_dir;
 
 extern struct dentry *notifier_err_inject_init(const char *name,
 		struct dentry *parent, struct notifier_err_inject *err_inject,

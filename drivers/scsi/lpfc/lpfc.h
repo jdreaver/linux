@@ -751,7 +751,7 @@ struct lpfc_vport {
 	struct dentry *debug_scsistat;
 	struct dentry *debug_ioktime;
 	struct dentry *debug_hdwqstat;
-	struct dentry *vport_debugfs_root;
+	struct debugfs_node *vport_debugfs_root;
 	struct lpfc_debugfs_trc *disc_trc;
 	atomic_t disc_trc_cnt;
 #endif
@@ -1348,7 +1348,7 @@ struct lpfc_hba {
 	unsigned long last_rsrc_error_time;
 	unsigned long last_ramp_down_time;
 #ifdef CONFIG_SCSI_LPFC_DEBUG_FS
-	struct dentry *hba_debugfs_root;
+	struct debugfs_node *hba_debugfs_root;
 	atomic_t debugfs_vport_count;
 	struct dentry *debug_multixri_pools;
 	struct dentry *debug_hbqinfo;
@@ -1389,19 +1389,19 @@ struct lpfc_hba {
 	sector_t lpfc_injerr_lba;
 #define LPFC_INJERR_LBA_OFF	(sector_t)(-1)
 
-	struct dentry *debug_slow_ring_trc;
+	struct debugfs_node *debug_slow_ring_trc;
 	struct lpfc_debugfs_trc *slow_ring_trc;
 	atomic_t slow_ring_trc_cnt;
 	/* iDiag debugfs sub-directory */
-	struct dentry *idiag_root;
-	struct dentry *idiag_pci_cfg;
-	struct dentry *idiag_bar_acc;
-	struct dentry *idiag_que_info;
-	struct dentry *idiag_que_acc;
-	struct dentry *idiag_drb_acc;
-	struct dentry *idiag_ctl_acc;
-	struct dentry *idiag_mbx_acc;
-	struct dentry *idiag_ext_acc;
+	struct debugfs_node *idiag_root;
+	struct debugfs_node *idiag_pci_cfg;
+	struct debugfs_node *idiag_bar_acc;
+	struct debugfs_node *idiag_que_info;
+	struct debugfs_node *idiag_que_acc;
+	struct debugfs_node *idiag_drb_acc;
+	struct debugfs_node *idiag_ctl_acc;
+	struct debugfs_node *idiag_mbx_acc;
+	struct debugfs_node *idiag_ext_acc;
 	uint8_t lpfc_idiag_last_eq;
 #endif
 	uint16_t nvmeio_trc_on;

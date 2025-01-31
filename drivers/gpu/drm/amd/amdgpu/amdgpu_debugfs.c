@@ -1643,7 +1643,7 @@ static const char * const debugfs_regs_names[] = {
 int amdgpu_debugfs_regs_init(struct amdgpu_device *adev)
 {
 	struct drm_minor *minor = adev_to_drm(adev)->primary;
-	struct dentry *ent, *root = minor->debugfs_root;
+	struct debugfs_node *ent, *root = minor->debugfs_root;
 	unsigned int i;
 
 	for (i = 0; i < ARRAY_SIZE(debugfs_regs); i++) {
@@ -2028,8 +2028,8 @@ DEFINE_DEBUGFS_ATTRIBUTE(fops_sclk_set, NULL,
 
 int amdgpu_debugfs_init(struct amdgpu_device *adev)
 {
-	struct dentry *root = adev_to_drm(adev)->primary->debugfs_root;
-	struct dentry *ent;
+	struct debugfs_node *root = adev_to_drm(adev)->primary->debugfs_root;
+	struct debugfs_node *ent;
 	int r, i;
 
 	if (!debugfs_initialized())

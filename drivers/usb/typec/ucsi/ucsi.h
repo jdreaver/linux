@@ -428,7 +428,7 @@ struct ucsi_debugfs_entry {
 		u64 high;
 	} response;
 	u32 status;
-	struct dentry *dentry;
+	struct debugfs_node *dentry;
 };
 
 struct ucsi {

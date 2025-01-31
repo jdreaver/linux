@@ -216,7 +216,7 @@ void hfi1_fault_exit_debugfs(struct hfi1_ibdev *ibd)
 int hfi1_fault_init_debugfs(struct hfi1_ibdev *ibd)
 {
 	struct dentry *parent = ibd->hfi1_ibdev_dbg;
-	struct dentry *fault_dir;
+	struct debugfs_node *fault_dir;
 
 	ibd->fault = kzalloc(sizeof(*ibd->fault), GFP_KERNEL);
 	if (!ibd->fault)

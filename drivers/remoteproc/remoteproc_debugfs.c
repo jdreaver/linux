@@ -25,7 +25,7 @@
 #include "remoteproc_internal.h"
 
 /* remoteproc debugfs parent dir */
-static struct dentry *rproc_dbg;
+static struct debugfs_node *rproc_dbg;
 
 /*
  * A coredump-configuration-to-string lookup table, for exposing a
@@ -378,7 +378,7 @@ static int rproc_carveouts_show(struct seq_file *seq, void *p)
 
 DEFINE_SHOW_ATTRIBUTE(rproc_carveouts);
 
-void rproc_remove_trace_file(struct dentry *tfile)
+void rproc_remove_trace_file(struct debugfs_node *tfile)
 {
 	debugfs_remove(tfile);
 }

@@ -287,13 +287,15 @@ struct v4l2_debugfs_if {
 };
 
 #ifdef CONFIG_DEBUG_FS
-struct v4l2_debugfs_if *v4l2_debugfs_if_alloc(struct dentry *root, u32 if_types,
+struct v4l2_debugfs_if *v4l2_debugfs_if_alloc(struct debugfs_node *root,
+					      u32 if_types,
 					      void *priv,
 					      v4l2_debugfs_if_read_t if_read);
 void v4l2_debugfs_if_free(struct v4l2_debugfs_if *infoframes);
 #else
 static inline
-struct v4l2_debugfs_if *v4l2_debugfs_if_alloc(struct dentry *root, u32 if_types,
+struct v4l2_debugfs_if *v4l2_debugfs_if_alloc(struct debugfs_node *root,
+					      u32 if_types,
 					      void *priv,
 					      v4l2_debugfs_if_read_t if_read)
 {

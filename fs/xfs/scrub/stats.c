@@ -45,7 +45,7 @@ struct xchk_scrub_stats {
 };
 
 struct xchk_stats {
-	struct dentry		*cs_debugfs;
+	struct debugfs_node *cs_debugfs;
 	struct xchk_scrub_stats	cs_stats[XFS_SCRUB_TYPE_NR];
 };
 

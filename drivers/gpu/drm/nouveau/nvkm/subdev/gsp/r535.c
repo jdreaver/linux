@@ -58,7 +58,7 @@
 #include <linux/ctype.h>
 #include <linux/parser.h>
 
-extern struct dentry *nouveau_debugfs_root;
+extern struct debugfs_node *nouveau_debugfs_root;
 
 #define GSP_MSG_MIN_SIZE GSP_PAGE_SIZE
 #define GSP_MSG_MAX_SIZE GSP_PAGE_MIN_SIZE * 16
@@ -2169,7 +2169,7 @@ r535_gsp_msg_libos_print(void *priv, u32 fn, void *repv, u32 repc)
  *
  * Creates a debugfs entry for a logging buffer with the name 'name'.
  */
-static struct dentry *create_debugfs(struct nvkm_gsp *gsp, const char *name,
+static struct debugfs_node *create_debugfs(struct nvkm_gsp *gsp, const char *name,
 				     struct debugfs_blob_wrapper *blob)
 {
 	struct dentry *dent;
@@ -2737,7 +2737,7 @@ struct r535_gsp_log {
 	 * Logging buffers in debugfs. The wrapper objects need to remain
 	 * in memory until the dentry is deleted.
 	 */
-	struct dentry *debugfs_logging_dir;
+	struct debugfs_node *debugfs_logging_dir;
 	struct debugfs_blob_wrapper blob_init;
 	struct debugfs_blob_wrapper blob_intr;
 	struct debugfs_blob_wrapper blob_rm;

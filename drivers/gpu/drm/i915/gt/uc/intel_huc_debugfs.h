@@ -9,6 +9,7 @@
 struct intel_huc;
 struct dentry;
 
-void intel_huc_debugfs_register(struct intel_huc *huc, struct dentry *root);
+void intel_huc_debugfs_register(struct intel_huc *huc,
+				struct debugfs_node *root);
 
 #endif /* DEBUGFS_HUC_H */

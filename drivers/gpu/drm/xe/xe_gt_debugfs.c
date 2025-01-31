@@ -315,7 +315,7 @@ void xe_gt_debugfs_register(struct xe_gt *gt)
 {
 	struct xe_device *xe = gt_to_xe(gt);
 	struct drm_minor *minor = gt_to_xe(gt)->drm.primary;
-	struct dentry *root;
+	struct debugfs_node *root;
 	char name[8];
 
 	xe_gt_assert(gt, minor->debugfs_root);

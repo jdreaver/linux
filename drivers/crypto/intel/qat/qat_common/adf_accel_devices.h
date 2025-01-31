@@ -432,7 +432,7 @@ struct adf_dc_data {
 };
 
 struct adf_pm {
-	struct dentry *debugfs_pm_status;
+	struct debugfs_node *debugfs_pm_status;
 	bool present;
 	int idle_irq_counters;
 	int throttle_irq_counters;
@@ -461,7 +461,7 @@ struct adf_accel_dev {
 	struct list_head compression_list;
 	unsigned long status;
 	atomic_t ref_count;
-	struct dentry *debugfs_dir;
+	struct debugfs_node *debugfs_dir;
 	struct dentry *fw_cntr_dbgfile;
 	struct dentry *cnv_dbgfile;
 	struct list_head list;

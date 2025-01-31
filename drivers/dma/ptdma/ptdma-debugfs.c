@@ -85,7 +85,7 @@ DEFINE_SHOW_ATTRIBUTE(pt_debugfs_stats);
 void ptdma_debugfs_setup(struct pt_device *pt)
 {
 	struct pt_cmd_queue *cmd_q;
-	struct dentry *debugfs_q_instance;
+	struct debugfs_node *debugfs_q_instance;
 
 	if (!debugfs_initialized())
 		return;

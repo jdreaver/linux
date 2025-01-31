@@ -678,7 +678,7 @@ struct hid_device {
 
 	/* debugging support via debugfs */
 	unsigned short debug;
-	struct dentry *debug_dir;
+	struct debugfs_node *debug_dir;
 	struct dentry *debug_rdesc;
 	struct dentry *debug_events;
 	struct list_head debug_list;

@@ -267,7 +267,7 @@ void
 nouveau_drm_debugfs_init(struct drm_minor *minor)
 {
 	struct nouveau_drm *drm = nouveau_drm(minor->dev);
-	struct dentry *dentry;
+	struct debugfs_node *dentry;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(nouveau_debugfs_files); i++) {
@@ -288,7 +288,7 @@ nouveau_drm_debugfs_init(struct drm_minor *minor)
 	if (!dentry)
 		return;
 
-	d_inode(dentry)->i_size = drm->vbios.length;
+	debugfs_node_inode(dentry)->i_size = drm->vbios.length;
 	dput(dentry);
 }
 

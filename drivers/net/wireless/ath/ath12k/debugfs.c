@@ -35,7 +35,7 @@ void ath12k_debugfs_soc_create(struct ath12k_base *ab)
 {
 	bool dput_needed;
 	char soc_name[64] = { 0 };
-	struct dentry *debugfs_ath12k;
+	struct debugfs_node *debugfs_ath12k;
 
 	debugfs_ath12k = debugfs_lookup("ath12k", NULL);
 	if (debugfs_ath12k) {

@@ -103,7 +103,7 @@ struct irq_desc {
 	struct proc_dir_entry	*dir;
 #endif
 #ifdef CONFIG_GENERIC_IRQ_DEBUGFS
-	struct dentry		*debugfs_file;
+	struct debugfs_node *debugfs_file;
 	const char		*dev_name;
 #endif
 #ifdef CONFIG_SPARSE_IRQ

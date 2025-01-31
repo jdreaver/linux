@@ -38,7 +38,7 @@ struct b43_dfs_file {
 
 struct b43_dfsentry {
 	struct b43_wldev *dev;
-	struct dentry *subdir;
+	struct debugfs_node *subdir;
 
 	struct b43_dfs_file file_shm16read;
 	struct b43_dfs_file file_shm16write;

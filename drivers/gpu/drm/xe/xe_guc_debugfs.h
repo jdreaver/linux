@@ -9,6 +9,6 @@
 struct dentry;
 struct xe_guc;
 
-void xe_guc_debugfs_register(struct xe_guc *guc, struct dentry *parent);
+void xe_guc_debugfs_register(struct xe_guc *guc, struct debugfs_node *parent);
 
 #endif
