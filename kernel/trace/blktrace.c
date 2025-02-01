@@ -473,29 +473,25 @@ static int blk_subbuf_start_callback(struct rchan_buf *buf, void *subbuf,
 	return 0;
 }
 
-static int blk_remove_buf_file_callback(struct dentry *dentry)
+static int blk_remove_buf_file_callback(struct debugfs_node *node)
 {
-	struct debugfs_node *node = debugfs_node_from_dentry(dentry);
-
 	debugfs_remove(node);
 
 	return 0;
 }
 
-static struct dentry *blk_create_buf_file_callback(const char *filename,
-						   struct dentry *parent,
+static struct debugfs_node *blk_create_buf_file_callback(const char *filename,
+						   struct debugfs_node *parent,
 						   umode_t mode,
 						   struct rchan_buf *buf,
 						   int *is_global)
 {
-	struct debugfs_node *node, *parent_node;
+	struct debugfs_node *node;
 
-	parent_node = debugfs_node_from_dentry(parent);
-
-	node = debugfs_create_file(filename, mode, parent_node, buf,
+	node = debugfs_create_file(filename, mode, parent, buf,
 				   &relay_file_operations);
 
-	return debugfs_node_dentry(node);
+	return node;
 }
 
 static const struct rchan_callbacks blk_relay_callbacks = {
@@ -525,7 +521,6 @@ static int do_blk_trace_setup(struct request_queue *q, char *name, dev_t dev,
 {
 	struct blk_trace *bt = NULL;
 	struct debugfs_node *dir = NULL;
-	struct dentry *dir_dentry;
 	int ret;
 
 	lockdep_assert_held(&q->debugfs_mutex);
@@ -596,8 +591,7 @@ static int do_blk_trace_setup(struct request_queue *q, char *name, dev_t dev,
 	debugfs_create_file("dropped", 0444, dir, bt, &blk_dropped_fops);
 	debugfs_create_file("msg", 0222, dir, bt, &blk_msg_fops);
 
-	dir_dentry = debugfs_node_dentry(dir);
-	bt->rchan = relay_open("trace", dir_dentry, buts->buf_size,
+	bt->rchan = relay_open("trace", dir, buts->buf_size,
 				buts->buf_nr, &blk_relay_callbacks, bt);
 	if (!bt->rchan)
 		goto err;

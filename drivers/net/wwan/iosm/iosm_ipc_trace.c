@@ -33,25 +33,21 @@ void ipc_trace_port_rx(struct iosm_imem *ipc_imem, struct sk_buff *skb)
 /* Creates relay file in debugfs. */
 static struct debugfs_node *
 ipc_trace_create_buf_file_handler(const char *filename,
-				  struct dentry *parent,
+				  struct debugfs_node *parent,
 				  umode_t mode,
 				  struct rchan_buf *buf,
 				  int *is_global)
 {
-	struct debugfs_node *parent_node = debugfs_node_from_dentry(parent);
-	struct debugfs_node *node;
-
 	*is_global = 1;
-	node = debugfs_create_file(filename, mode, parent_node, buf,
+	return debugfs_create_file(filename, mode, parent, buf,
 				   &relay_file_operations);
 
-	return debugfs_node_dentry(node);
 }
 
 /* Removes relay file from debugfs. */
-static int ipc_trace_remove_buf_file_handler(struct dentry *dentry)
+static int ipc_trace_remove_buf_file_handler(struct debugfs_node *node)
 {
-	debugfs_remove(debugfs_node_from_dentry(dentry));
+	debugfs_remove(node);
 	return 0;
 }
 
@@ -141,7 +137,6 @@ struct iosm_trace *ipc_trace_init(struct iosm_imem *ipc_imem)
 {
 	struct ipc_chnl_cfg chnl_cfg = { 0 };
 	struct iosm_trace *ipc_trace;
-	struct dentry *debugfs_dir;
 
 	ipc_chnl_cfg_get(&chnl_cfg, IPC_MEM_CTRL_CHL_ID_3);
 	ipc_imem_channel_init(ipc_imem, IPC_CTYPE_CTRL, chnl_cfg,
@@ -163,9 +158,8 @@ struct iosm_trace *ipc_trace_init(struct iosm_imem *ipc_imem)
 						   ipc_imem->debugfs_dir,
 						   ipc_trace, &ipc_trace_fops);
 
-	debugfs_dir = debugfs_node_dentry(ipc_imem->debugfs_dir);
 	ipc_trace->ipc_rchan = relay_open(IOSM_TRC_DEBUGFS_TRACE,
-					  debugfs_dir,
+					  ipc_imem->debugfs_dir,
 					  IOSM_TRC_SUB_BUFF_SIZE,
 					  IOSM_TRC_N_SUB_BUFF,
 					  &relay_callbacks, NULL);

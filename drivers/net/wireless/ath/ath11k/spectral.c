@@ -127,27 +127,25 @@ struct ath11k_spectral_search_report {
 	u8 rel_pwr_db;
 };
 
-static struct dentry *create_buf_file_handler(const char *filename,
-					      struct dentry *parent,
-					      umode_t mode,
-					      struct rchan_buf *buf,
-					      int *is_global)
+
+static struct debugfs_node *create_buf_file_handler(const char *filename,
+						    struct debugfs_node *parent,
+						    umode_t mode,
+						    struct rchan_buf *buf,
+						    int *is_global)
 {
-	struct debugfs_node *parent_node = debugfs_node_from_dentry(parent);
 	struct debugfs_node *buf_file;
 
-	buf_file = debugfs_create_file(filename, mode, parent_node, buf,
+	buf_file = debugfs_create_file(filename, mode, parent, buf,
 				       &relay_file_operations);
-	if (IS_ERR(buf_file))
-		return NULL;
 
 	*is_global = 1;
-	return debugfs_node_dentry(buf_file);
+	return buf_file;
 }
 
-static int remove_buf_file_handler(struct dentry *dentry)
+static int remove_buf_file_handler(struct debugfs_node *node)
 {
-	debugfs_remove(debugfs_node_from_dentry(dentry));
+	debugfs_remove(node);
 
 	return 0;
 }
@@ -930,10 +928,9 @@ void ath11k_spectral_deinit(struct ath11k_base *ab)
 static inline int ath11k_spectral_debug_register(struct ath11k *ar)
 {
 	int ret;
-	struct dentry *dbg_dent = debugfs_node_dentry(ar->debug.debugfs_pdev);
 
 	ar->spectral.rfs_scan = relay_open("spectral_scan",
-					   dbg_dent,
+					   ar->debug.debugfs_pdev,
 					   ATH11K_SPECTRAL_SUB_BUFF_SIZE(ar->ab),
 					   ATH11K_SPECTRAL_NUM_SUB_BUF,
 					   &rfs_scan_cb, NULL);

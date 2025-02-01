@@ -375,28 +375,27 @@ mt7996_fw_debug_wa_get(void *data, u64 *val)
 DEFINE_DEBUGFS_ATTRIBUTE(fops_fw_debug_wa, mt7996_fw_debug_wa_get,
 			 mt7996_fw_debug_wa_set, "%lld\n");
 
-static struct dentry * create_buf_file_cb(const char *filename,
-					  struct dentry *parent,
-					  umode_t mode,
-					  struct rchan_buf *buf,
-					  int *is_global)
+static struct debugfs_node * create_buf_file_cb(const char *filename,
+						struct debugfs_node *parent,
+						umode_t mode,
+						struct rchan_buf *buf,
+						int *is_global)
 {
-	struct debugfs_node *parent_node = debugfs_node_from_dentry(parent);
 	struct debugfs_node *f;
 
-	f = debugfs_create_file("fwlog_data", mode, parent_node, buf,
+	f = debugfs_create_file("fwlog_data", mode, parent, buf,
 				&relay_file_operations);
 	if (IS_ERR(f))
 		return NULL;
 
 	*is_global = 1;
 
-	return debugfs_node_dentry(f);
+	return f;
 }
 
-static int remove_buf_file_cb(struct dentry *f)
+static int remove_buf_file_cb(struct debugfs_node *f)
 {
-	debugfs_remove(debugfs_node_from_dentry(f));
+	debugfs_remove(f);
 
 	return 0;
 }
@@ -409,10 +408,9 @@ mt7996_fw_debug_bin_set(void *data, u64 val)
 		.remove_buf_file = remove_buf_file_cb,
 	};
 	struct mt7996_dev *dev = data;
-	struct dentry *dbg_dent = debugfs_node_dentry(dev->debugfs_dir);
 
 	if (!dev->relay_fwlog)
-		dev->relay_fwlog = relay_open("fwlog_data", dbg_dent,
+		dev->relay_fwlog = relay_open("fwlog_data", dev->debugfs_dir,
 					      1500, 512, &relay_cb, NULL);
 	if (!dev->relay_fwlog)
 		return -ENOMEM;

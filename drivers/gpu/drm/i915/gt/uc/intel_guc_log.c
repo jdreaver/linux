@@ -242,15 +242,14 @@ static int subbuf_start_callback(struct rchan_buf *buf,
 /*
  * file_create() callback. Creates relay file in debugfs.
  */
-static struct dentry *create_buf_file_callback(const char *filename,
-					       struct dentry *parent,
-					       umode_t mode,
-					       struct rchan_buf *buf,
-					       int *is_global)
+static struct debugfs_node *
+create_buf_file_callback(const char *filename,
+			 struct debugfs_node *parent,
+			 umode_t mode,
+			 struct rchan_buf *buf,
+			 int *is_global)
 {
-	struct debugfs_node *parent_node = debugfs_node_from_dentry(parent);
 	struct debugfs_node *buf_file;
-	struct dentry *buf_dentry;
 
 	/*
 	 * This to enable the use of a single buffer for the relay channel and
@@ -263,22 +262,20 @@ static struct dentry *create_buf_file_callback(const char *filename,
 	if (!parent)
 		return NULL;
 
-	buf_file = debugfs_create_file(filename, mode, parent_node,
-				       buf, &relay_file_operations);
+	buf_file = debugfs_create_file(filename, mode,
+				       parent, buf, &relay_file_operations);
 	if (IS_ERR(buf_file))
 		return NULL;
 
-	buf_dentry = debugfs_node_dentry(buf_file);
-
-	return buf_dentry;
+	return buf_file;
 }
 
 /*
  * file_remove() default callback. Removes relay file in debugfs.
  */
-static int remove_buf_file_callback(struct dentry *dentry)
+static int remove_buf_file_callback(struct debugfs_node *node)
 {
-	debugfs_remove(debugfs_node_from_dentry(dentry));
+	debugfs_remove(node);
 	return 0;
 }
 
@@ -525,7 +522,6 @@ static int guc_log_relay_create(struct intel_guc_log *log)
 {
 	struct intel_guc *guc = log_to_guc(log);
 	struct drm_i915_private *i915 = guc_to_i915(guc);
-	struct dentry *dbgfs_node_dentry;
 	struct rchan *guc_log_relay_chan;
 	size_t n_subbufs, subbuf_size;
 	int ret;
@@ -550,9 +546,8 @@ static int guc_log_relay_create(struct intel_guc_log *log)
 	if (!guc->dbgfs_node)
 		return -ENOENT;
 
-	dbgfs_node_dentry = debugfs_node_dentry(guc->dbgfs_node);
 	guc_log_relay_chan = relay_open("guc_log",
-					dbgfs_node_dentry,
+					guc->dbgfs_node,
 					subbuf_size, n_subbufs,
 					&relay_callbacks, i915);
 	if (!guc_log_relay_chan) {

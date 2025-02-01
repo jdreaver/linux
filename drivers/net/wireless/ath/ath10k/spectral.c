@@ -463,27 +463,26 @@ static const struct file_operations fops_spectral_bins = {
 	.llseek = default_llseek,
 };
 
-static struct dentry *create_buf_file_handler(const char *filename,
-					      struct dentry *parent,
-					      umode_t mode,
-					      struct rchan_buf *buf,
-					      int *is_global)
+static struct debugfs_node *create_buf_file_handler(const char *filename,
+						    struct debugfs_node *parent,
+						    umode_t mode,
+						    struct rchan_buf *buf,
+						    int *is_global)
 {
-	struct debugfs_node *parent_node = debugfs_node_from_dentry(parent);
 	struct debugfs_node *buf_file;
 
-	buf_file = debugfs_create_file(filename, mode, parent_node, buf,
+	buf_file = debugfs_create_file(filename, mode, parent, buf,
 				       &relay_file_operations);
 	if (IS_ERR(buf_file))
 		return NULL;
 
 	*is_global = 1;
-	return debugfs_node_dentry(buf_file);
+	return buf_file;
 }
 
-static int remove_buf_file_handler(struct dentry *dentry)
+static int remove_buf_file_handler(struct debugfs_node *node)
 {
-	debugfs_remove(debugfs_node_from_dentry(dentry));
+	debugfs_remove(node);
 
 	return 0;
 }
@@ -519,13 +518,11 @@ int ath10k_spectral_vif_stop(struct ath10k_vif *arvif)
 
 int ath10k_spectral_create(struct ath10k *ar)
 {
-	struct dentry *dbg_dent = debugfs_node_dentry(ar->debug.debugfs_phy);
-
 	/* The buffer size covers whole channels in dual bands up to 128 bins.
 	 * Scan with bigger than 128 bins needs to be run on single band each.
 	 */
 	ar->spectral.rfs_chan_spec_scan = relay_open("spectral_scan",
-						     dbg_dent,
+						     ar->debug.debugfs_phy,
 						     1140, 2500,
 						     &rfs_spec_scan_cb, NULL);
 	debugfs_create_file("spectral_scan_ctl",
