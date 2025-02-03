@@ -38,7 +38,7 @@ struct cs35l56_hda {
 	struct snd_kcontrol *mixer_ctl[4];
 
 #if IS_ENABLED(CONFIG_SND_DEBUG)
-	struct dentry *debugfs_root;
+	struct debugfs_node *debugfs_root;
 #endif
 };
 

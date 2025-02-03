@@ -504,6 +504,6 @@ void ttm_kmap_iter_linear_io_fini(struct ttm_kmap_iter_linear_io *iter_io,
 				  struct ttm_resource *mem);
 
 void ttm_resource_manager_create_debugfs(struct ttm_resource_manager *man,
-					 struct dentry * parent,
+					 struct debugfs_node * parent,
 					 const char *name);
 #endif

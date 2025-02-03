@@ -10,11 +10,12 @@ struct caam_perfmon;
 
 #ifdef CONFIG_DEBUG_FS
 void caam_debugfs_init(struct caam_drv_private *ctrlpriv,
-		       struct caam_perfmon __force *perfmon, struct dentry *root);
+		       struct caam_perfmon __force *perfmon,
+		       struct debugfs_node *root);
 #else
 static inline void caam_debugfs_init(struct caam_drv_private *ctrlpriv,
 				     struct caam_perfmon __force *perfmon,
-				     struct dentry *root)
+				     struct debugfs_node *root)
 {}
 #endif
 

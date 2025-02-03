@@ -2216,14 +2216,14 @@ extern void securityfs_recursive_remove(struct dentry *dentry);
 #else /* CONFIG_SECURITYFS */
 
 static inline struct dentry *securityfs_create_dir(const char *name,
-						   struct dentry *parent)
+						   struct debugfs_node *parent)
 {
 	return ERR_PTR(-ENODEV);
 }
 
 static inline struct dentry *securityfs_create_file(const char *name,
 						    umode_t mode,
-						    struct dentry *parent,
+						    struct debugfs_node *parent,
 						    void *data,
 						    const struct file_operations *fops)
 {
@@ -2231,7 +2231,7 @@ static inline struct dentry *securityfs_create_file(const char *name,
 }
 
 static inline struct dentry *securityfs_create_symlink(const char *name,
-					struct dentry *parent,
+					struct debugfs_node *parent,
 					const char *target,
 					const struct inode_operations *iops)
 {

@@ -9,6 +9,7 @@
 struct intel_uc;
 struct dentry;
 
-void intel_uc_debugfs_register(struct intel_uc *uc, struct dentry *gt_root);
+void intel_uc_debugfs_register(struct intel_uc *uc,
+			       struct debugfs_node *gt_root);
 
 #endif /* DEBUGFS_UC_H */

@@ -6263,7 +6263,7 @@ set_mac_error:
 }
 
 #ifdef CONFIG_DEBUG_FS
-static struct dentry *stmmac_fs_dir;
+static struct debugfs_node *stmmac_fs_dir;
 
 static void sysfs_display_ring(void *head, int size, int extend_desc,
 			       struct seq_file *seq, dma_addr_t dma_phy_addr)

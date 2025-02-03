@@ -162,7 +162,7 @@ struct host1x {
 	struct host1x_channel_list channel_list;
 	struct host1x_memory_context_list context_list;
 
-	struct dentry *debugfs;
+	struct debugfs_node *debugfs;
 
 	struct mutex devices_lock;
 	struct list_head devices;
@@ -329,7 +329,8 @@ static inline void host1x_hw_pushbuffer_init(struct host1x *host,
 	host->cdma_pb_op->init(pb);
 }
 
-static inline void host1x_hw_debug_init(struct host1x *host, struct dentry *de)
+static inline void host1x_hw_debug_init(struct host1x *host,
+				        struct debugfs_node *de)
 {
 	if (host->debug_op && host->debug_op->debug_init)
 		host->debug_op->debug_init(de);

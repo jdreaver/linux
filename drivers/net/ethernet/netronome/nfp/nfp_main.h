@@ -128,7 +128,7 @@ struct nfp_pf {
 
 	struct device *hwmon_dev;
 
-	struct dentry *ddir;
+	struct debugfs_node *ddir;
 
 	unsigned int max_data_vnics;
 	unsigned int num_vnics;

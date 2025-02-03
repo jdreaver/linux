@@ -664,7 +664,7 @@ struct sdw_slave {
 	struct sdw_bus *bus;
 	struct sdw_slave_prop prop;
 #ifdef CONFIG_DEBUG_FS
-	struct dentry *debugfs;
+	struct debugfs_node *debugfs;
 #endif
 	struct list_head node;
 	struct completion port_ready[SDW_MAX_PORTS];
@@ -1011,7 +1011,7 @@ struct sdw_bus {
 	struct irq_chip irq_chip;
 	struct irq_domain *domain;
 #ifdef CONFIG_DEBUG_FS
-	struct dentry *debugfs;
+	struct debugfs_node *debugfs;
 #endif
 	bool multi_link;
 	unsigned int lane_used_bandwidth[SDW_MAX_LANES];

@@ -461,7 +461,7 @@ struct rkisp1_resizer {
  *				  was not sent to userspace
  */
 struct rkisp1_debug {
-	struct dentry *debugfs_dir;
+	struct debugfs_node *debugfs_dir;
 	unsigned long data_loss;
 	unsigned long outform_size_error;
 	unsigned long img_stabilization_size_error;

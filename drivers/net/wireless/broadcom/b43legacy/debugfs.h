@@ -34,7 +34,7 @@ struct b43legacy_dfs_file {
 
 struct b43legacy_dfsentry {
 	struct b43legacy_wldev *dev;
-	struct dentry *subdir;
+	struct debugfs_node *subdir;
 
 	struct b43legacy_dfs_file file_tsf;
 	struct b43legacy_dfs_file file_ucode_regs;

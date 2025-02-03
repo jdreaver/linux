@@ -1180,11 +1180,11 @@ static inline struct inode *file_inode(const struct file *f)
  * Files with "fake" path should not exist nowadays, so use an assertion to make
  * sure that file_dentry() was not papering over filesystem bugs.
  */
-static inline struct dentry *file_dentry(const struct file *file)
+static inline struct debugfs_node *file_dentry(const struct file *file)
 {
-	struct dentry *dentry = file->f_path.dentry;
+	struct debugfs_node *dentry = file->f_path.dentry;
 
-	WARN_ON_ONCE(d_inode(dentry) != file_inode(file));
+	WARN_ON_ONCE(debugfs_node_inode(dentry) != file_inode(file));
 	return dentry;
 }
 
@@ -2006,7 +2006,7 @@ struct renamedata {
 int vfs_rename(struct renamedata *);
 
 static inline int vfs_whiteout(struct mnt_idmap *idmap,
-			       struct inode *dir, struct dentry *dentry)
+			       struct inode *dir, struct debugfs_node *dentry)
 {
 	return vfs_mknod(idmap, dir, dentry, S_IFCHR | WHITEOUT_MODE,
 			 WHITEOUT_DEV);

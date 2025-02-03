@@ -70,7 +70,7 @@ struct pinctrl_dev {
 	struct pinctrl_state *hog_sleep;
 	struct mutex mutex;
 #ifdef CONFIG_DEBUG_FS
-	struct dentry *device_root;
+	struct debugfs_node *device_root;
 #endif
 };
 
