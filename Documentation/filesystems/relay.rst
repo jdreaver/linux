@@ -15,8 +15,8 @@ clients write into the channel buffers using efficient write
 functions; these automatically log into the current cpu's channel
 buffer.  User space applications mmap() or read() from the relay files
 and retrieve the data as it becomes available.  The relay files
-themselves are files created in a host filesystem, e.g. debugfs, and
-are associated with the channel buffers using the API described below.
+themselves are files created in debugfs, and are associated with the
+channel buffers using the API described below.
 
 The format of the data logged into the channel buffers is completely
 up to the kernel client; the relay interface does however provide
@@ -142,17 +142,16 @@ close()     decrements the channel buffer's refcount.  When the refcount
 	    buffer open, the channel buffer is freed.
 =========== ============================================================
 
-In order for a user application to make use of relay files, the
-host filesystem must be mounted.  For example::
+In order for a user application to make use of relay files, debugfs must
+be mounted. For example::
 
 	mount -t debugfs debugfs /sys/kernel/debug
 
 .. Note::
 
-	the host filesystem doesn't need to be mounted for kernel
-	clients to create or use channels - it only needs to be
-	mounted when user space applications need access to the buffer
-	data.
+	debugfs doesn't need to be mounted for kernel clients to create
+	or use channels - it only needs to be mounted when user space
+	applications need access to the buffer data.
 
 
 The relay interface kernel API
@@ -184,8 +183,6 @@ TBD(curr. line MT:/API/)
     subbuf_start(buf, subbuf, prev_subbuf, prev_padding)
     buf_mapped(buf, filp)
     buf_unmapped(buf, filp)
-    create_buf_file(filename, parent, mode, buf, is_global)
-    remove_buf_file(dentry)
 
   helper functions::
 
@@ -196,72 +193,12 @@ TBD(curr. line MT:/API/)
 Creating a channel
 ------------------
 
-relay_open() is used to create a channel, along with its per-cpu
-channel buffers.  Each channel buffer will have an associated file
-created for it in the host filesystem, which can be and mmapped or
-read from in user space.  The files are named basename0...basenameN-1
-where N is the number of online cpus, and by default will be created
-in the root of the filesystem (if the parent param is NULL).  If you
-want a directory structure to contain your relay files, you should
-create it using the host filesystem's directory creation function,
-e.g. debugfs_create_dir(), and pass the parent directory to
-relay_open().  Users are responsible for cleaning up any directory
-structure they create, when the channel is closed - again the host
-filesystem's directory removal functions should be used for that,
-e.g. debugfs_remove().
-
-In order for a channel to be created and the host filesystem's files
-associated with its channel buffers, the user must provide definitions
-for two callback functions, create_buf_file() and remove_buf_file().
-create_buf_file() is called once for each per-cpu buffer from
-relay_open() and allows the user to create the file which will be used
-to represent the corresponding channel buffer.  The callback should
-return the dentry of the file created to represent the channel buffer.
-remove_buf_file() must also be defined; it's responsible for deleting
-the file(s) created in create_buf_file() and is called during
-relay_close().
-
-Here are some typical definitions for these callbacks, in this case
-using debugfs::
-
-    /*
-    * create_buf_file() callback.  Creates relay file in debugfs.
-    */
-    static struct dentry *create_buf_file_handler(const char *filename,
-						struct dentry *parent,
-						umode_t mode,
-						struct rchan_buf *buf,
-						int *is_global)
-    {
-	    return debugfs_create_file(filename, mode, parent, buf,
-				    &relay_file_operations);
-    }
-
-    /*
-    * remove_buf_file() callback.  Removes relay file from debugfs.
-    */
-    static int remove_buf_file_handler(struct dentry *dentry)
-    {
-	    debugfs_remove(dentry);
-
-	    return 0;
-    }
-
-    /*
-    * relay interface callbacks
-    */
-    static struct rchan_callbacks relay_callbacks =
-    {
-	    .create_buf_file = create_buf_file_handler,
-	    .remove_buf_file = remove_buf_file_handler,
-    };
-
-And an example relay_open() invocation using them::
-
-  chan = relay_open("cpu", NULL, SUBBUF_SIZE, N_SUBBUFS, &relay_callbacks, NULL);
-
-If the create_buf_file() callback fails, or isn't defined, channel
-creation and thus relay_open() will fail.
+relay_open() is used to create a channel, along with its per-cpu channel
+buffers. Each channel buffer will have an associated file created for it
+in debugfs, which can be and mmapped or read from in user space. The
+files are named basename0...basenameN-1 where N is the number of online
+cpus, and by will be created under the directory specified by the parent
+param.
 
 The total size of each per-cpu buffer is calculated by multiplying the
 number of sub-buffers by the sub-buffer size passed into relay_open().
@@ -277,29 +214,24 @@ though, it's safe to assume that having only 1 sub-buffer is a bad
 idea - you're guaranteed to either overwrite data or lose events
 depending on the channel mode being used.
 
-The create_buf_file() implementation can also be defined in such a way
-as to allow the creation of a single 'global' buffer instead of the
-default per-cpu set.  This can be useful for applications interested
-mainly in seeing the relative ordering of system-wide events without
-the need to bother with saving explicit timestamps for the purpose of
+relay also supports the creation of a single 'global' buffer instead of
+the default per-cpu set. This can be useful for applications interested
+mainly in seeing the relative ordering of system-wide events without the
+need to bother with saving explicit timestamps for the purpose of
 merging/sorting per-cpu files in a postprocessing step.
 
-To have relay_open() create a global buffer, the create_buf_file()
-implementation should set the value of the is_global outparam to a
-non-zero value in addition to creating the file that will be used to
-represent the single buffer.  In the case of a global buffer,
-create_buf_file() and remove_buf_file() will be called only once.  The
-normal channel-writing functions, e.g. relay_write(), can still be
-used - writes from any cpu will transparently end up in the global
-buffer - but since it is a global buffer, callers should make sure
-they use the proper locking for such a buffer, either by wrapping
-writes in a spinlock, or by copying a write function from relay.h and
-creating a local version that internally does the proper locking.
+To create a global buffer, the is_global value in rchan_callbacks should
+be set to a non-zero value. The normal channel-writing functions, e.g.
+relay_write(), can still be used - writes from any cpu will
+transparently end up in the global buffer - but since it is a global
+buffer, callers should make sure they use the proper locking for such a
+buffer, either by wrapping writes in a spinlock, or by copying a write
+function from relay.h and creating a local version that internally does
+the proper locking.
 
 The private_data passed into relay_open() allows clients to associate
-user-defined data with a channel, and is immediately available
-(including in create_buf_file()) via chan->private_data or
-buf->chan->private_data.
+user-defined data with a channel, and is immediately available via
+chan->private_data or buf->chan->private_data.
 
 Buffer-only channels
 --------------------

@@ -104,49 +104,9 @@ struct rchan_callbacks
 			     size_t prev_padding);
 
 	/*
-	 * create_buf_file - create file to represent a relay channel buffer
-	 * @filename: the name of the file to create
-	 * @parent: the parent of the file to create
-	 * @mode: the mode of the file to create
-	 * @buf: the channel buffer
-	 * @is_global: outparam - set non-zero if the buffer should be global
-	 *
-	 * Called during relay_open(), once for each per-cpu buffer,
-	 * to allow the client to create a file to be used to
-	 * represent the corresponding channel buffer.  If the file is
-	 * created outside of relay, the parent must also exist in
-	 * that filesystem.
-	 *
-	 * The callback should return the dentry of the file created
-	 * to represent the relay buffer.
-	 *
-	 * Setting the is_global outparam to a non-zero value will
-	 * cause relay_open() to create a single global buffer rather
-	 * than the default set of per-cpu buffers.
-	 *
-	 * This callback is mandatory.
-	 *
-	 * See Documentation/filesystems/relay.rst for more info.
+	 * is_global - create a single global buffer rather than per-cpu buffers
 	 */
-	struct dentry *(*create_buf_file)(const char *filename,
-					  struct dentry *parent,
-					  umode_t mode,
-					  struct rchan_buf *buf,
-					  int *is_global);
-
-	/*
-	 * remove_buf_file - remove file representing a relay channel buffer
-	 * @dentry: the dentry of the file to remove
-	 *
-	 * Called during relay_close(), once for each per-cpu buffer,
-	 * to allow the client to remove a file used to represent a
-	 * channel buffer.
-	 *
-	 * The callback should return 0 if successful, negative if not.
-	 *
-	 * This callback is mandatory.
-	 */
-	int (*remove_buf_file)(struct dentry *dentry);
+	int is_global;
 };
 
 /*
@@ -272,11 +232,6 @@ static inline void subbuf_start_reserve(struct rchan_buf *buf,
 	buf->offset = length;
 }
 
-/*
- * exported relay file operations, kernel/relay.c
- */
-extern const struct file_operations relay_file_operations;
-
 #ifdef CONFIG_RELAY
 int relay_prepare_cpu(unsigned int cpu);
 #else
@@ -284,4 +239,3 @@ int relay_prepare_cpu(unsigned int cpu);
 #endif
 
 #endif /* _LINUX_RELAY_H */
-

@@ -239,50 +239,10 @@ static int subbuf_start_callback(struct rchan_buf *buf,
 	return 1;
 }
 
-/*
- * file_create() callback. Creates relay file in debugfs.
- */
-static struct dentry *create_buf_file_callback(const char *filename,
-					       struct dentry *parent,
-					       umode_t mode,
-					       struct rchan_buf *buf,
-					       int *is_global)
-{
-	struct dentry *buf_file;
-
-	/*
-	 * This to enable the use of a single buffer for the relay channel and
-	 * correspondingly have a single file exposed to User, through which
-	 * it can collect the logs in order without any post-processing.
-	 * Need to set 'is_global' even if parent is NULL for early logging.
-	 */
-	*is_global = 1;
-
-	if (!parent)
-		return NULL;
-
-	buf_file = debugfs_create_file(filename, mode,
-				       parent, buf, &relay_file_operations);
-	if (IS_ERR(buf_file))
-		return NULL;
-
-	return buf_file;
-}
-
-/*
- * file_remove() default callback. Removes relay file in debugfs.
- */
-static int remove_buf_file_callback(struct dentry *dentry)
-{
-	debugfs_remove(dentry);
-	return 0;
-}
-
 /* relay channel callbacks */
 static const struct rchan_callbacks relay_callbacks = {
 	.subbuf_start = subbuf_start_callback,
-	.create_buf_file = create_buf_file_callback,
-	.remove_buf_file = remove_buf_file_callback,
+	.is_global = 1,
 };
 
 static void guc_move_to_next_buf(struct intel_guc_log *log)

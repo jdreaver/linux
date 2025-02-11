@@ -127,30 +127,8 @@ struct ath11k_spectral_search_report {
 	u8 rel_pwr_db;
 };
 
-static struct dentry *create_buf_file_handler(const char *filename,
-					      struct dentry *parent,
-					      umode_t mode,
-					      struct rchan_buf *buf,
-					      int *is_global)
-{
-	struct dentry *buf_file;
-
-	buf_file = debugfs_create_file(filename, mode, parent, buf,
-				       &relay_file_operations);
-	*is_global = 1;
-	return buf_file;
-}
-
-static int remove_buf_file_handler(struct dentry *dentry)
-{
-	debugfs_remove(dentry);
-
-	return 0;
-}
-
 static const struct rchan_callbacks rfs_scan_cb = {
-	.create_buf_file = create_buf_file_handler,
-	.remove_buf_file = remove_buf_file_handler,
+	.is_global = 1,
 };
 
 static struct ath11k_vif *ath11k_spectral_get_vdev(struct ath11k *ar)

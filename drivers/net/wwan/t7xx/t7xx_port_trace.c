@@ -15,23 +15,6 @@
 #define T7XX_TRC_SUB_BUFF_SIZE		131072
 #define T7XX_TRC_N_SUB_BUFF		32
 
-static struct dentry *t7xx_trace_create_buf_file_handler(const char *filename,
-							 struct dentry *parent,
-							 umode_t mode,
-							 struct rchan_buf *buf,
-							 int *is_global)
-{
-	*is_global = 1;
-	return debugfs_create_file(filename, mode, parent, buf,
-				   &relay_file_operations);
-}
-
-static int t7xx_trace_remove_buf_file_handler(struct dentry *dentry)
-{
-	debugfs_remove(dentry);
-	return 0;
-}
-
 static int t7xx_trace_subbuf_start_handler(struct rchan_buf *buf, void *subbuf,
 					   void *prev_subbuf, size_t prev_padding)
 {
@@ -45,8 +28,7 @@ static int t7xx_trace_subbuf_start_handler(struct rchan_buf *buf, void *subbuf,
 
 static struct rchan_callbacks relay_callbacks = {
 	.subbuf_start = t7xx_trace_subbuf_start_handler,
-	.create_buf_file = t7xx_trace_create_buf_file_handler,
-	.remove_buf_file = t7xx_trace_remove_buf_file_handler,
+	.is_global = 1,
 };
 
 static void t7xx_trace_port_uninit(struct t7xx_port *port)

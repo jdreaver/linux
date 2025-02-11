@@ -30,26 +30,6 @@ void ipc_trace_port_rx(struct iosm_imem *ipc_imem, struct sk_buff *skb)
 	dev_kfree_skb(skb);
 }
 
-/* Creates relay file in debugfs. */
-static struct dentry *
-ipc_trace_create_buf_file_handler(const char *filename,
-				  struct dentry *parent,
-				  umode_t mode,
-				  struct rchan_buf *buf,
-				  int *is_global)
-{
-	*is_global = 1;
-	return debugfs_create_file(filename, mode, parent, buf,
-				   &relay_file_operations);
-}
-
-/* Removes relay file from debugfs. */
-static int ipc_trace_remove_buf_file_handler(struct dentry *dentry)
-{
-	debugfs_remove(dentry);
-	return 0;
-}
-
 static int ipc_trace_subbuf_start_handler(struct rchan_buf *buf, void *subbuf,
 					  void *prev_subbuf,
 					  size_t prev_padding)
@@ -65,8 +45,7 @@ static int ipc_trace_subbuf_start_handler(struct rchan_buf *buf, void *subbuf,
 /* Relay interface callbacks */
 static struct rchan_callbacks relay_callbacks = {
 	.subbuf_start = ipc_trace_subbuf_start_handler,
-	.create_buf_file = ipc_trace_create_buf_file_handler,
-	.remove_buf_file = ipc_trace_remove_buf_file_handler,
+	.is_global = 1,
 };
 
 /* Copy the trace control mode to user buffer */

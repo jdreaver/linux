@@ -473,27 +473,8 @@ static int blk_subbuf_start_callback(struct rchan_buf *buf, void *subbuf,
 	return 0;
 }
 
-static int blk_remove_buf_file_callback(struct dentry *dentry)
-{
-	debugfs_remove(dentry);
-
-	return 0;
-}
-
-static struct dentry *blk_create_buf_file_callback(const char *filename,
-						   struct dentry *parent,
-						   umode_t mode,
-						   struct rchan_buf *buf,
-						   int *is_global)
-{
-	return debugfs_create_file(filename, mode, parent, buf,
-					&relay_file_operations);
-}
-
 static const struct rchan_callbacks blk_relay_callbacks = {
 	.subbuf_start		= blk_subbuf_start_callback,
-	.create_buf_file	= blk_create_buf_file_callback,
-	.remove_buf_file	= blk_remove_buf_file_callback,
 };
 
 static void blk_trace_setup_lba(struct blk_trace *bt,
@@ -1902,4 +1883,3 @@ void blk_fill_rwbs(char *rwbs, blk_opf_t opf)
 EXPORT_SYMBOL_GPL(blk_fill_rwbs);
 
 #endif /* CONFIG_EVENT_TRACING */
-

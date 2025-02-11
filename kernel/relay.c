@@ -22,6 +22,7 @@
 #include <linux/mm.h>
 #include <linux/cpu.h>
 #include <linux/splice.h>
+#include <linux/debugfs.h>
 
 /* list of open channels, for cpu hotplug */
 static DEFINE_MUTEX(relay_channels_mutex);
@@ -344,6 +345,8 @@ static inline void relay_set_buf_dentry(struct rchan_buf *buf,
 	d_inode(buf->dentry)->i_size = buf->early_bytes;
 }
 
+const struct file_operations relay_file_operations;
+
 static struct dentry *relay_create_buf_file(struct rchan *chan,
 					    struct rchan_buf *buf,
 					    unsigned int cpu)
@@ -357,11 +360,13 @@ static struct dentry *relay_create_buf_file(struct rchan *chan,
 	snprintf(tmpname, NAME_MAX, "%s%d", chan->base_filename, cpu);
 
 	/* Create file in fs */
-	dentry = chan->cb->create_buf_file(tmpname, chan->parent,
-					   S_IRUSR, buf,
-					   &chan->is_global);
+	dentry = debugfs_create_file(tmpname, S_IRUSR, chan->parent, buf,
+				     &relay_file_operations);
+
 	if (IS_ERR(dentry))
 		dentry = NULL;
+
+	chan->is_global = chan->cb->is_global;
 
 	kfree(tmpname);
 
@@ -392,9 +397,8 @@ static struct rchan_buf *relay_open_buf(struct rchan *chan, unsigned int cpu)
 		relay_set_buf_dentry(buf, dentry);
 	} else {
 		/* Only retrieve global info, nothing more, nothing less */
-		dentry = chan->cb->create_buf_file(NULL, NULL,
-						   S_IRUSR, buf,
-						   &chan->is_global);
+		dentry = debugfs_create_file(NULL, S_IRUSR, NULL, buf,
+					     &relay_file_operations);
 		if (IS_ERR_OR_NULL(dentry))
 			goto free_buf;
 	}
@@ -426,7 +430,7 @@ static void relay_close_buf(struct rchan_buf *buf)
 {
 	buf->finalized = 1;
 	irq_work_sync(&buf->wakeup_work);
-	buf->chan->cb->remove_buf_file(buf->dentry);
+	debugfs_remove(buf->dentry);
 	kref_put(&buf->kref, relay_remove_buf);
 }
 
@@ -486,7 +490,7 @@ struct rchan *relay_open(const char *base_filename,
 		return NULL;
 	if (subbuf_size > UINT_MAX / n_subbufs)
 		return NULL;
-	if (!cb || !cb->create_buf_file || !cb->remove_buf_file)
+	if (!cb)
 		return NULL;
 
 	chan = kzalloc(sizeof(struct rchan), GFP_KERNEL);
@@ -1081,4 +1085,3 @@ const struct file_operations relay_file_operations = {
 	.read		= relay_file_read,
 	.release	= relay_file_release,
 };
-EXPORT_SYMBOL_GPL(relay_file_operations);

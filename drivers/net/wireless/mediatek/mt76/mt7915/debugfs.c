@@ -582,36 +582,11 @@ mt7915_fw_debug_wa_get(void *data, u64 *val)
 DEFINE_DEBUGFS_ATTRIBUTE(fops_fw_debug_wa, mt7915_fw_debug_wa_get,
 			 mt7915_fw_debug_wa_set, "%lld\n");
 
-static struct dentry *
-create_buf_file_cb(const char *filename, struct dentry *parent, umode_t mode,
-		   struct rchan_buf *buf, int *is_global)
-{
-	struct dentry *f;
-
-	f = debugfs_create_file("fwlog_data", mode, parent, buf,
-				&relay_file_operations);
-	if (IS_ERR(f))
-		return NULL;
-
-	*is_global = 1;
-
-	return f;
-}
-
-static int
-remove_buf_file_cb(struct dentry *f)
-{
-	debugfs_remove(f);
-
-	return 0;
-}
-
 static int
 mt7915_fw_debug_bin_set(void *data, u64 val)
 {
 	static struct rchan_callbacks relay_cb = {
-		.create_buf_file = create_buf_file_cb,
-		.remove_buf_file = remove_buf_file_cb,
+		.is_global = 1,
 	};
 	struct mt7915_dev *dev = data;
 

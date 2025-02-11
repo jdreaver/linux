@@ -463,33 +463,8 @@ static const struct file_operations fops_spectral_bins = {
 	.llseek = default_llseek,
 };
 
-static struct dentry *create_buf_file_handler(const char *filename,
-					      struct dentry *parent,
-					      umode_t mode,
-					      struct rchan_buf *buf,
-					      int *is_global)
-{
-	struct dentry *buf_file;
-
-	buf_file = debugfs_create_file(filename, mode, parent, buf,
-				       &relay_file_operations);
-	if (IS_ERR(buf_file))
-		return NULL;
-
-	*is_global = 1;
-	return buf_file;
-}
-
-static int remove_buf_file_handler(struct dentry *dentry)
-{
-	debugfs_remove(dentry);
-
-	return 0;
-}
-
 static const struct rchan_callbacks rfs_spec_scan_cb = {
-	.create_buf_file = create_buf_file_handler,
-	.remove_buf_file = remove_buf_file_handler,
+	.is_global = 1,
 };
 
 int ath10k_spectral_start(struct ath10k *ar)
